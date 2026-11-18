@@ -681,8 +681,12 @@
 
   <script>
     const STORAGE_KEY = 'binned_ledger_v2';
-    const CLOUD_CFG_KEY = 'binned_supabase_cfg_v1';
+    const CLOUD_CFG_KEY = 'binned_supabase_cfg_v2';
     const SIMPLEFIN_CFG_KEY = 'binned_simplefin_cfg_v1';
+
+    // Built-in Supabase backend connection (replace with your project's URL and Publishable/Anon Key)
+    const DEFAULT_SUPABASE_URL = 'https://xkcxikafpnwrtrwwmqbq.supabase.co';
+    const DEFAULT_SUPABASE_KEY = 'sb_publishable__2wZ2u4EjpJ0R5dtvqvRhA_T6rTDZxy';
 
     function getCurrentMonthKey() {
       const d = new Date();
@@ -771,9 +775,15 @@
     function loadCloudCfg() {
       try {
         const raw = localStorage.getItem(CLOUD_CFG_KEY);
-        if (raw) return JSON.parse(raw);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          return {
+            username: String(parsed.username || '').trim(),
+            password: String(parsed.password || '')
+          };
+        }
       } catch (e) {}
-      return { url: '', key: '', ledgerKey: '' };
+      return { username: '', password: '' };
     }
 
     function loadSimpleFinCfg() {
@@ -801,12 +811,37 @@
 
     function saveCloudCfg(cfg) {
       cloudCfg = {
-        url: sanitizeUrl(cfg.url),
-        key: String(cfg.key || '').trim(),
-        ledgerKey: String(cfg.ledgerKey || '').trim()
+        username: String(cfg.username || '').trim(),
+        password: String(cfg.password || '')
       };
       localStorage.setItem(CLOUD_CFG_KEY, JSON.stringify(cloudCfg));
       updateSyncUI();
+    }
+
+    function getSupabaseUrl() {
+      return sanitizeUrl(DEFAULT_SUPABASE_URL);
+    }
+
+    function getSupabaseKey() {
+      return String(DEFAULT_SUPABASE_KEY || '').trim();
+    }
+
+    function hasBuiltInSupabase() {
+      const u = getSupabaseUrl();
+      const k = getSupabaseKey();
+      return Boolean(u && !u.includes('YOUR_PROJECT_ID') && k && !k.includes('YOUR_SUPABASE'));
+    }
+
+    async function deriveLedgerKey(username, password) {
+      const normUser = String(username || '').trim().toLowerCase();
+      const raw = `${normUser}::${String(password || '')}`;
+      if (window.crypto && window.crypto.subtle) {
+        const enc = new TextEncoder().encode(raw);
+        const buf = await window.crypto.subtle.digest('SHA-256', enc);
+        const hex = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+        return `user_${normUser}_${hex}`;
+      }
+      return `user_${normUser}_${btoa(unescape(encodeURIComponent(raw)))}`;
     }
 
     function saveState(skipCloud = false) {
@@ -818,7 +853,7 @@
     }
 
     function isCloudConfigured() {
-      return Boolean(cloudCfg && cloudCfg.url && cloudCfg.key && cloudCfg.ledgerKey);
+      return Boolean(hasBuiltInSupabase() && cloudCfg && cloudCfg.username && cloudCfg.password);
     }
 
     function isSimpleFinConfigured() {
@@ -826,9 +861,10 @@
     }
 
     function getSupabaseHeaders(extra = {}) {
-      const headers = { 'apikey': cloudCfg.key, ...extra };
-      if (cloudCfg.key && cloudCfg.key.startsWith('eyJ')) {
-        headers['Authorization'] = `Bearer ${cloudCfg.key}`;
+      const key = getSupabaseKey();
+      const headers = { 'apikey': key, ...extra };
+      if (key && key.startsWith('eyJ')) {
+        headers['Authorization'] = `Bearer ${key}`;
       }
       return headers;
     }
@@ -839,7 +875,7 @@
       if (!dot || !txt) return;
       if (!isCloudConfigured()) {
         dot.className = 'sync-dot';
-        txt.textContent = 'Local Only';
+        txt.textContent = hasBuiltInSupabase() ? 'Sign In to Sync' : 'Local Only';
         return;
       }
       if (statusOverride === 'syncing') {
@@ -850,7 +886,7 @@
         txt.textContent = 'Sync Error';
       } else {
         dot.className = 'sync-dot online';
-        txt.textContent = 'Cloud Synced';
+        txt.textContent = escapeHtml(cloudCfg.username);
       }
     }
 
@@ -858,12 +894,13 @@
       if (!isCloudConfigured()) return;
       updateSyncUI('syncing');
       try {
-        const cleanUrl = sanitizeUrl(cloudCfg.url);
+        const cleanUrl = getSupabaseUrl();
+        const derivedKey = await deriveLedgerKey(cloudCfg.username, cloudCfg.password);
         const res = await fetch(`${cleanUrl}/rest/v1/rpc/save_ledger`, {
           method: 'POST',
           headers: getSupabaseHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
-            p_key: cloudCfg.ledgerKey,
+            p_key: derivedKey,
             p_payload: state
           })
         });
@@ -878,11 +915,12 @@
       if (!isCloudConfigured()) return;
       updateSyncUI('syncing');
       try {
-        const cleanUrl = sanitizeUrl(cloudCfg.url);
+        const cleanUrl = getSupabaseUrl();
+        const derivedKey = await deriveLedgerKey(cloudCfg.username, cloudCfg.password);
         const res = await fetch(`${cleanUrl}/rest/v1/rpc/get_ledger`, {
           method: 'POST',
           headers: getSupabaseHeaders({ 'Content-Type': 'application/json' }),
-          body: JSON.stringify({ p_key: cloudCfg.ledgerKey })
+          body: JSON.stringify({ p_key: derivedKey })
         });
         if (!res.ok) throw new Error('Pull failed: ' + res.status);
         const payload = await res.json();
@@ -892,21 +930,21 @@
           if (!state.monthlyIncomes) state.monthlyIncomes = {};
           saveState(true);
           render();
-          if (!silent) showToast('Synced latest ledger from cloud.');
+          if (!silent) showToast(`Signed in as ${cloudCfg.username} — synced latest ledger.`);
         } else {
           await pushToCloud();
-          if (!silent) showToast('Initialized new cloud ledger.');
+          if (!silent) showToast(`Created new cloud ledger for ${cloudCfg.username}.`);
         }
         updateSyncUI('online');
       } catch (e) {
         updateSyncUI('error');
-        if (!silent) showToast('Could not connect to Supabase. Check URL, Key, and SQL setup.');
+        if (!silent) showToast('Could not connect to Supabase. Check built-in project URL/Key and SQL setup.');
       }
     }
 
     async function syncSimpleFinNow() {
       if (!isSimpleFinConfigured()) {
-        openSimpleFinModal();
+        switchTab('settings');
         return;
       }
       if (isSyncingBank) return;
@@ -915,13 +953,14 @@
       try {
         // Ensure latest local state is pushed first so we don't overwrite anything
         await pushToCloud();
-        const cleanUrl = sanitizeUrl(cloudCfg.url);
+        const cleanUrl = getSupabaseUrl();
+        const derivedKey = await deriveLedgerKey(cloudCfg.username, cloudCfg.password);
         const res = await fetch(`${cleanUrl}/functions/v1/sync-simplefin`, {
           method: 'POST',
           headers: getSupabaseHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             action: 'sync',
-            ledger_key: cloudCfg.ledgerKey,
+            ledger_key: derivedKey,
             access_url: simpleFinCfg.accessUrl,
             days: simpleFinCfg.days || 14
           })
@@ -1685,42 +1724,43 @@
 
         <div class="two-col">
           <div>
-            <!-- Supabase Cloud Sync -->
+            <!-- Cloud Account & Sync -->
             <div class="panel">
               <div class="panel-header">
-                <h3 class="panel-title">Supabase Cloud Sync</h3>
-                <span class="tag ${isCloudConfigured() ? 'tag-paid' : ''}">${isCloudConfigured() ? 'Connected' : 'Local Only'}</span>
+                <h3 class="panel-title">Cloud Ledger Account</h3>
+                <span class="tag ${isCloudConfigured() ? 'tag-paid' : ''}">${isCloudConfigured() ? 'Signed In: ' + escapeHtml(cloudCfg.username) : (hasBuiltInSupabase() ? 'Connected (Sign In Required)' : 'Backend Not Configured')}</span>
               </div>
-              <p style="font-size:12.5px; color:var(--ink-muted); margin-top:0;">
-                Sync your ledger across phone and desktop using your Supabase project and personal passphrase.
-              </p>
-              <div class="field" style="margin-bottom:10px;">
-                <label>Supabase Project URL</label>
-                <div style="display:flex; gap:6px;">
-                  <input id="set-sb-url" type="text" placeholder="https://yourproject.supabase.co" value="${escapeHtml(cloudCfg.url)}" style="flex:1;" />
-                  <button type="button" class="btn btn-sm" onclick="copyFieldText('set-sb-url', 'Supabase URL')">Copy</button>
+              ${!hasBuiltInSupabase() ? `
+                <div style="padding:10px 12px; border:2px solid var(--danger); border-radius:8px; background:var(--danger-soft); color:var(--danger); font-size:12px; font-weight:700; margin-bottom:12px;">
+                  Developer Setup Needed: Set <code>DEFAULT_SUPABASE_URL</code> and <code>DEFAULT_SUPABASE_KEY</code> at the top of the script in <code>index.html</code> to enable automatic cloud connections.
                 </div>
-              </div>
+              ` : `
+                <p style="font-size:12.5px; color:var(--ink-muted); margin-top:0;">
+                  Connected automatically to Supabase. Enter your <strong>Username</strong> and <strong>Password</strong> to unlock and sync your ledger across devices.
+                </p>
+              `}
               <div class="field" style="margin-bottom:10px;">
-                <label>Supabase Publishable / Anon Key</label>
+                <label>Username</label>
                 <div style="display:flex; gap:6px;">
-                  <input id="set-sb-key" type="password" placeholder="sb_publishable_... or eyJ..." value="${escapeHtml(cloudCfg.key)}" style="flex:1;" />
-                  <button type="button" class="btn btn-sm" onclick="toggleSecretField('set-sb-key', this)">Show</button>
-                  <button type="button" class="btn btn-sm" onclick="copyFieldText('set-sb-key', 'Supabase Key')">Copy</button>
+                  <input id="set-sb-username" type="text" autocomplete="username" placeholder="e.g. alex_smith" value="${escapeHtml(cloudCfg.username)}" style="flex:1;" />
+                  <button type="button" class="btn btn-sm" onclick="copyFieldText('set-sb-username', 'Username')">Copy</button>
                 </div>
               </div>
               <div class="field" style="margin-bottom:14px;">
-                <label>Personal Ledger Passphrase</label>
+                <label>Password</label>
                 <div style="display:flex; gap:6px;">
-                  <input id="set-sb-ledger" type="text" placeholder="e.g. my-secret-binned-ledger-2026" value="${escapeHtml(cloudCfg.ledgerKey)}" style="flex:1;" />
-                  <button type="button" class="btn btn-sm" onclick="copyFieldText('set-sb-ledger', 'Ledger Passphrase')">Copy</button>
+                  <input id="set-sb-password" type="password" autocomplete="current-password" placeholder="Enter your ledger password" value="${escapeHtml(cloudCfg.password)}" style="flex:1;" />
+                  <button type="button" class="btn btn-sm" onclick="toggleSecretField('set-sb-password', this)">Show</button>
                 </div>
               </div>
               <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;">
-                <div>
-                  ${isCloudConfigured() ? `<button class="btn btn-sm" onclick="pullFromCloud(false)">Pull Latest Now</button>` : ''}
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                  ${isCloudConfigured() ? `
+                    <button class="btn btn-sm" onclick="pullFromCloud(false)">Sync Now</button>
+                    <button class="btn btn-sm btn-ghost" onclick="signOutCloud()">Sign Out</button>
+                  ` : ''}
                 </div>
-                <button class="btn btn-primary" onclick="saveSettingsCloud()">Save &amp; Sync</button>
+                <button class="btn btn-primary" onclick="saveSettingsCloud()">Sign In &amp; Sync</button>
               </div>
             </div>
 
@@ -1839,21 +1879,29 @@
     }
 
     async function saveSettingsCloud() {
-      const url = document.getElementById('set-sb-url').value.trim();
-      const key = document.getElementById('set-sb-key').value.trim();
-      const ledgerKey = document.getElementById('set-sb-ledger').value.trim();
-      saveCloudCfg({ url, key, ledgerKey });
-      if (url && key && ledgerKey) {
-        await pullFromCloud(false);
-      } else {
-        showToast('Cloud sync disabled (Local Only mode).');
-        render();
+      const username = document.getElementById('set-sb-username').value.trim();
+      const password = document.getElementById('set-sb-password').value;
+      if (!username || !password) {
+        alert('Please enter both a Username and Password to sync your cloud ledger.');
+        return;
       }
+      if (!hasBuiltInSupabase()) {
+        alert('The app does not have its built-in Supabase Project URL and Publishable Key configured yet.');
+        return;
+      }
+      saveCloudCfg({ username, password });
+      await pullFromCloud(false);
+    }
+
+    function signOutCloud() {
+      saveCloudCfg({ username: '', password: '' });
+      showToast('Signed out of cloud sync (Local Only mode).');
+      render();
     }
 
     async function claimSettingsSimpleFinToken() {
       if (!isCloudConfigured()) {
-        alert('Save your Supabase Cloud Sync settings first so SimpleFIN can store transactions in your cloud ledger.');
+        alert('Sign in with your Username and Password first so SimpleFIN can store transactions in your cloud ledger.');
         return;
       }
       const tokenInput = document.getElementById('set-sf-token');
@@ -1864,7 +1912,7 @@
       btn.disabled = true;
       btn.textContent = 'Claiming...';
       try {
-        const cleanUrl = sanitizeUrl(cloudCfg.url);
+        const cleanUrl = getSupabaseUrl();
         const res = await fetch(`${cleanUrl}/functions/v1/sync-simplefin`, {
           method: 'POST',
           headers: getSupabaseHeaders({ 'Content-Type': 'application/json' }),
@@ -1892,7 +1940,7 @@
 
     async function saveSettingsSimpleFin() {
       if (!isCloudConfigured()) {
-        alert('Save your Supabase Cloud Sync settings first.');
+        alert('Sign in with your Username and Password first.');
         return;
       }
       const accessUrl = document.getElementById('set-sf-url').value.trim();
@@ -1972,8 +2020,8 @@
 
     function openSimpleFinModal() {
       if (!isCloudConfigured()) {
-        alert('Connect Supabase Cloud Sync first (click Sync) so SimpleFIN can save transactions into your cloud ledger.');
-        openCloudSyncModal();
+        alert('Sign in with your Username and Password in Settings first so SimpleFIN can save transactions into your cloud ledger.');
+        switchTab('settings');
         return;
       }
       openModal(`
@@ -2028,7 +2076,7 @@
       btn.disabled = true;
       btn.textContent = 'Claiming...';
       try {
-        const cleanUrl = sanitizeUrl(cloudCfg.url);
+        const cleanUrl = getSupabaseUrl();
         const res = await fetch(`${cleanUrl}/functions/v1/sync-simplefin`, {
           method: 'POST',
           headers: getSupabaseHeaders({ 'Content-Type': 'application/json' }),
@@ -2110,56 +2158,7 @@
     }
 
     function openCloudSyncModal() {
-      openModal(`
-        <h3 style="margin-top:0; font-family:var(--serif);">Supabase Cloud Sync</h3>
-        <p style="font-size:13px; color:var(--ink-muted);">
-          Connect your Supabase project so your phone and computer share the exact same isolated ledger via your personal passphrase.
-        </p>
-        <div class="field" style="margin-bottom:10px;">
-          <label>Supabase Project URL</label>
-          <div style="display:flex; gap:6px;">
-            <input id="sb-url" type="text" placeholder="https://yourproject.supabase.co" value="${escapeHtml(cloudCfg.url)}" style="flex:1;" />
-            <button type="button" class="btn btn-sm" onclick="copyFieldText('sb-url', 'Supabase URL')">Copy</button>
-          </div>
-        </div>
-        <div class="field" style="margin-bottom:10px;">
-          <label>Supabase Publishable / Anon Key</label>
-          <div style="display:flex; gap:6px;">
-            <input id="sb-key" type="password" placeholder="sb_publishable_... or eyJ..." value="${escapeHtml(cloudCfg.key)}" style="flex:1;" />
-            <button type="button" class="btn btn-sm" onclick="toggleSecretField('sb-key', this)">Show</button>
-            <button type="button" class="btn btn-sm" onclick="copyFieldText('sb-key', 'Supabase Key')">Copy</button>
-          </div>
-        </div>
-        <div class="field" style="margin-bottom:14px;">
-          <label>Personal Ledger Passphrase (use the same one on Phone &amp; PC)</label>
-          <div style="display:flex; gap:6px;">
-            <input id="sb-ledger" type="text" placeholder="e.g. my-secret-binned-ledger-2026" value="${escapeHtml(cloudCfg.ledgerKey)}" style="flex:1;" />
-            <button type="button" class="btn btn-sm" onclick="copyFieldText('sb-ledger', 'Ledger Passphrase')">Copy</button>
-          </div>
-        </div>
-        <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;">
-          <div>
-            ${isCloudConfigured() ? `<button class="btn btn-sm" onclick="pullFromCloud(false)">Pull Latest Now</button>` : ''}
-          </div>
-          <div style="display:flex; gap:8px;">
-            <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-            <button class="btn btn-primary" onclick="saveAndConnectCloud()">Save &amp; Sync</button>
-          </div>
-        </div>
-      `);
-    }
-
-    async function saveAndConnectCloud() {
-      const url = document.getElementById('sb-url').value.trim();
-      const key = document.getElementById('sb-key').value.trim();
-      const ledgerKey = document.getElementById('sb-ledger').value.trim();
-      saveCloudCfg({ url, key, ledgerKey });
-      closeModal();
-      if (url && key && ledgerKey) {
-        await pullFromCloud(false);
-      } else {
-        showToast('Cloud sync disabled (Local Only mode).');
-      }
+      switchTab('settings');
     }
 
     function openAddPurchaseModal() {
