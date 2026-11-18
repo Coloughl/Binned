@@ -1,0 +1,1529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Binned — Personal Spending &amp; Bill Ledger</title>
+  <style>
+    :root {
+      --paper: #f7f4ed;
+      --paper-elevated: #fdfbf7;
+      --paper-muted: #efeae0;
+      --ink: #1b1a17;
+      --ink-muted: #666156;
+      --rule: #d6cfc0;
+      --rule-strong: #1b1a17;
+      --accent: #1d4e3e;
+      --accent-soft: #e4ede9;
+      --warn: #a64b2a;
+      --warn-soft: #f7e6df;
+      --danger: #9e2a2b;
+      --danger-soft: #f9e3e3;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --serif: Georgia, "Times New Roman", serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--sans);
+      font-size: 14px;
+      line-height: 1.45;
+      overflow-x: hidden;
+    }
+
+    .tabular { font-variant-numeric: tabular-nums; font-family: var(--mono); }
+
+    /* Layout Shell */
+    .app-shell {
+      display: grid;
+      grid-template-columns: 230px 1fr;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      background: var(--paper-elevated);
+      border-right: 1px solid var(--rule);
+      padding: 24px 18px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+    }
+
+    .brand {
+      border-bottom: 2px solid var(--rule-strong);
+      padding-bottom: 14px;
+      margin-bottom: 20px;
+    }
+    .brand-title {
+      font-family: var(--serif);
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin: 0;
+    }
+    .brand-sub {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--ink-muted);
+      margin-top: 2px;
+    }
+
+    .nav-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .nav-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 500;
+      text-align: left;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .nav-btn:hover { background: var(--paper-muted); }
+    .nav-btn.active {
+      background: var(--ink);
+      color: var(--paper-elevated);
+      font-weight: 600;
+    }
+
+    .badge {
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: var(--warn);
+      color: #fff;
+      font-weight: 700;
+    }
+    .nav-btn.active .badge {
+      background: var(--paper-elevated);
+      color: var(--ink);
+    }
+
+    .sidebar-footer {
+      border-top: 1px solid var(--rule);
+      padding-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .main {
+      padding: 28px 34px 60px;
+      max-width: 1120px;
+      width: 100%;
+    }
+
+    /* Header Bar */
+    .page-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      border-bottom: 2px solid var(--rule-strong);
+      padding-bottom: 14px;
+      margin-bottom: 24px;
+    }
+    .page-title {
+      font-family: var(--serif);
+      font-size: 28px;
+      margin: 0;
+      line-height: 1.15;
+    }
+    .page-meta {
+      font-size: 12px;
+      color: var(--ink-muted);
+      margin-top: 4px;
+    }
+
+    .header-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 5px;
+      border: 1px solid var(--rule-strong);
+      background: var(--paper-elevated);
+      color: var(--ink);
+      cursor: pointer;
+      transition: background 0.12s ease;
+    }
+    .btn:hover { background: var(--paper-muted); }
+    .btn-primary {
+      background: var(--ink);
+      color: var(--paper-elevated);
+    }
+    .btn-primary:hover { background: #33312b; }
+    .btn-accent {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .btn-accent:hover { background: #163d30; }
+    .btn-sm { padding: 4px 9px; font-size: 12px; }
+    .btn-ghost { border-color: var(--rule); color: var(--ink-muted); }
+
+    /* Cards & Specimen Panels */
+    .panel {
+      background: var(--paper-elevated);
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+      padding: 18px 20px;
+      margin-bottom: 20px;
+    }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid var(--rule);
+      padding-bottom: 10px;
+      margin-bottom: 14px;
+    }
+    .panel-title {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+      margin: 0;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+    .stat-box {
+      background: var(--paper-elevated);
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+      padding: 14px 16px;
+    }
+    .stat-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--ink-muted);
+    }
+    .stat-value {
+      font-size: 22px;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+    .stat-sub {
+      font-size: 12px;
+      color: var(--ink-muted);
+      margin-top: 2px;
+    }
+
+    /* Queue Items & Bin Pills */
+    .queue-item {
+      border: 1px solid var(--rule);
+      background: var(--paper-elevated);
+      border-radius: 6px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .queue-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+    }
+    .queue-merchant {
+      font-weight: 700;
+      font-size: 15px;
+    }
+    .queue-date {
+      font-size: 12px;
+      color: var(--ink-muted);
+    }
+    .queue-amount {
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .bin-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .bin-pill {
+      padding: 5px 11px;
+      border-radius: 999px;
+      border: 1px solid var(--rule-strong);
+      background: var(--paper);
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .bin-pill:hover {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* Progress Bars */
+    .bar-track {
+      width: 100%;
+      height: 8px;
+      background: var(--paper-muted);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .bar-fill {
+      height: 100%;
+      background: var(--accent);
+      transition: width 0.2s ease;
+    }
+    .bar-fill.warn { background: var(--warn); }
+    .bar-fill.danger { background: var(--danger); }
+
+    /* Bin Grid */
+    .bins-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 14px;
+    }
+    .bin-card {
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+      padding: 14px;
+      background: var(--paper);
+    }
+
+    /* Tables */
+    .table-wrap { width: 100%; overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th {
+      text-align: left;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--ink-muted);
+      border-bottom: 1px solid var(--rule-strong);
+      padding: 8px 10px;
+    }
+    td {
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--rule);
+      vertical-align: middle;
+    }
+    tr:last-child td { border-bottom: none; }
+    .num { text-align: right; }
+
+    /* Plan / Paychecks */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 20px;
+      align-items: start;
+    }
+    .paycheck-card {
+      border: 1px solid var(--rule-strong);
+      border-radius: 6px;
+      padding: 16px;
+      background: var(--paper);
+      margin-bottom: 16px;
+    }
+    .split-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 7px 0;
+      border-bottom: 1px dashed var(--rule);
+    }
+    .split-row:last-child { border-bottom: none; }
+
+    /* Forms & Modals */
+    input, select, textarea {
+      font-family: var(--sans);
+      font-size: 13px;
+      padding: 7px 10px;
+      border: 1px solid var(--rule-strong);
+      border-radius: 4px;
+      background: var(--paper-elevated);
+      color: var(--ink);
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .field label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--ink-muted);
+      margin-bottom: 4px;
+    }
+    .field input, .field select, .field textarea { width: 100%; }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(27, 26, 23, 0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 100;
+    }
+    .modal {
+      background: var(--paper-elevated);
+      border: 2px solid var(--rule-strong);
+      border-radius: 8px;
+      max-width: 560px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 22px;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: var(--ink);
+      color: var(--paper-elevated);
+      padding: 11px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+      z-index: 200;
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      background: var(--paper-muted);
+      border: 1px solid var(--rule);
+    }
+    .tag-paid { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+    .tag-warn { background: var(--danger-soft); color: var(--danger); border-color: var(--danger); }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 820px) {
+      .app-shell { grid-template-columns: 1fr; }
+      .sidebar {
+        position: static;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--rule);
+        padding: 14px 16px;
+      }
+      .brand { margin-bottom: 10px; padding-bottom: 8px; }
+      .nav-list { flex-direction: row; flex-wrap: wrap; }
+      .nav-btn { width: auto; padding: 7px 11px; font-size: 13px; }
+      .sidebar-footer { display: none; }
+      .main { padding: 18px 16px 60px; }
+      .two-col { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div>
+        <div class="brand">
+          <h1 class="brand-title">Binned</h1>
+          <div class="brand-sub">Specimen Spending Ledger</div>
+        </div>
+        <nav class="nav-list" id="nav">
+          <button class="nav-btn active" data-tab="queue">
+            <span>To Bin</span>
+            <span class="badge" id="queue-badge">0</span>
+          </button>
+          <button class="nav-btn" data-tab="overview">
+            <span>Overview</span>
+          </button>
+          <button class="nav-btn" data-tab="plan">
+            <span>Plan &amp; Splits</span>
+          </button>
+          <button class="nav-btn" data-tab="debts">
+            <span>Debts &amp; Loans</span>
+          </button>
+        </nav>
+      </div>
+      <div class="sidebar-footer">
+        <button class="btn btn-sm" onclick="exportBackup()">Export JSON Backup</button>
+        <button class="btn btn-sm btn-ghost" onclick="triggerRestore()">Restore Backup</button>
+        <input type="file" id="restore-input" accept=".json" class="hidden" onchange="importBackup(event)" />
+      </div>
+    </aside>
+
+    <main class="main" id="main-content"></main>
+  </div>
+
+  <!-- Modal Container -->
+  <div id="modal-root" class="hidden"></div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script>
+    const STORAGE_KEY = 'binned_ledger_v1';
+
+    const DEFAULT_STATE = {
+      bins: [
+        { id: 'mtg', name: 'MTG Cards', budget: 120 },
+        { id: 'beer', name: 'Beer', budget: 80 },
+        { id: 'groceries', name: 'Groceries', budget: 450 },
+        { id: 'eating_out', name: 'Eating Out', budget: 200 },
+        { id: 'transport', name: 'Transport', budget: 160 },
+        { id: 'home', name: 'Home', budget: 150 },
+        { id: 'fun', name: 'Fun', budget: 120 }
+      ],
+      transactions: [
+        { id: 't1', date: '2026-11-17', merchant: 'Card Kingdom', amount: 42.50, binId: null },
+        { id: 't2', date: '2026-11-16', merchant: 'Keweenaw Brewing Co', amount: 18.50, binId: null },
+        { id: 't3', date: '2026-11-16', merchant: 'Econo Foods', amount: 84.20, binId: null },
+        { id: 't4', date: '2026-11-12', merchant: 'Local Game Store - Draft', amount: 25.00, binId: 'mtg' },
+        { id: 't5', date: '2026-11-10', merchant: 'Econo Foods', amount: 112.40, binId: 'groceries' },
+        { id: 't6', date: '2026-11-08', merchant: 'Shell Station', amount: 44.10, binId: 'transport' }
+      ],
+      bills: [
+        { id: 'b1', name: 'Rent', amount: 1150, dueDate: '2026-12-01', recurring: true, paid: false },
+        { id: 'b2', name: 'Electric & Gas', amount: 135, dueDate: '2026-11-24', recurring: true, paid: false },
+        { id: 'b3', name: 'Internet', amount: 65, dueDate: '2026-11-28', recurring: true, paid: false },
+        { id: 'b4', name: 'Auto Insurance', amount: 118, dueDate: '2026-11-20', recurring: true, paid: false }
+      ],
+      paychecks: [
+        {
+          id: 'p1',
+          label: 'Paycheck #1 (Nov 15)',
+          amount: 1650,
+          allocations: [
+            { id: 'a1', targetType: 'bill', targetId: 'b1', amount: 575 },
+            { id: 'a2', targetType: 'bill', targetId: 'b4', amount: 118 },
+            { id: 'a3', targetType: 'bin', targetId: 'groceries', amount: 225 }
+          ]
+        },
+        {
+          id: 'p2',
+          label: 'Paycheck #2 (Nov 30)',
+          amount: 1650,
+          allocations: [
+            { id: 'a4', targetType: 'bill', targetId: 'b1', amount: 575 }
+          ]
+        }
+      ],
+      debts: [
+        { id: 'd1', name: 'Chase Sapphire Card', balance: 2400, apr: 22.99, payment: 150 },
+        { id: 'd2', name: 'Auto Loan', balance: 9800, apr: 5.49, payment: 295 }
+      ]
+    };
+
+    let state = loadState();
+    let currentTab = 'queue';
+    let filterBin = 'all';
+    let searchQuery = '';
+    let extraDebtPayment = 0;
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch (e) {}
+      return JSON.parse(JSON.stringify(DEFAULT_STATE));
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      updateBadges();
+    }
+
+    function fmt(n) {
+      return '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function uid(prefix = 'id') {
+      return prefix + '_' + Math.random().toString(36).slice(2, 9);
+    }
+
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => el.classList.add('hidden'), 3200);
+    }
+
+    function updateBadges() {
+      const unbinned = state.transactions.filter(t => !t.binId).length;
+      const badge = document.getElementById('queue-badge');
+      badge.textContent = unbinned;
+      badge.style.display = unbinned > 0 ? 'inline-block' : 'none';
+    }
+
+    // Navigation
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentTab = btn.dataset.tab;
+        render();
+      });
+    });
+
+    function getBinSpent(binId) {
+      return state.transactions
+        .filter(t => t.binId === binId)
+        .reduce((sum, t) => sum + Number(t.amount), 0);
+    }
+
+    function assignBin(txId, binId) {
+      const tx = state.transactions.find(t => t.id === txId);
+      const bin = state.bins.find(b => b.id === binId);
+      if (!tx || !bin) return;
+      tx.binId = binId;
+      saveState();
+      const left = bin.budget - getBinSpent(binId);
+      showToast(`Binned to ${bin.name}. ${fmt(left)} left in ${bin.name}.`);
+      render();
+    }
+
+    function unbinTx(txId) {
+      const tx = state.transactions.find(t => t.id === txId);
+      if (!tx) return;
+      tx.binId = null;
+      saveState();
+      showToast('Moved back to To Bin queue.');
+      render();
+    }
+
+    function deleteTx(txId) {
+      state.transactions = state.transactions.filter(t => t.id !== txId);
+      saveState();
+      render();
+    }
+
+    // Render Router
+    function render() {
+      updateBadges();
+      const main = document.getElementById('main-content');
+      if (currentTab === 'queue') renderQueue(main);
+      else if (currentTab === 'overview') renderOverview(main);
+      else if (currentTab === 'plan') renderPlan(main);
+      else if (currentTab === 'debts') renderDebts(main);
+    }
+
+    // 1. TO BIN QUEUE
+    function renderQueue(main) {
+      const queue = state.transactions
+        .filter(t => !t.binId)
+        .sort((a, b) => b.date.localeCompare(a.date));
+
+      main.innerHTML = `
+        <div class="page-header">
+          <div>
+            <h2 class="page-title">To Bin Queue</h2>
+            <div class="page-meta">${queue.length} purchase${queue.length === 1 ? '' : 's'} waiting for a bin</div>
+          </div>
+          <div class="header-actions">
+            <button class="btn" onclick="openChaseImportModal()">Import Chase CSV / Paste</button>
+            <button class="btn btn-primary" onclick="openAddPurchaseModal()">+ Log Purchase</button>
+          </div>
+        </div>
+
+        ${queue.length === 0 ? `
+          <div class="panel" style="text-align:center; padding: 36px 20px;">
+            <div style="font-family:var(--serif); font-size:20px; margin-bottom:6px;">All caught up</div>
+            <div style="color:var(--ink-muted); margin-bottom:16px;">Every logged purchase has been assigned to a bin.</div>
+            <button class="btn btn-primary" onclick="openAddPurchaseModal()">+ Log a Purchase</button>
+          </div>
+        ` : queue.map(tx => `
+          <div class="queue-item">
+            <div class="queue-top">
+              <div>
+                <div class="queue-merchant">${escapeHtml(tx.merchant)}</div>
+                <div class="queue-date">${tx.date}</div>
+              </div>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span class="queue-amount tabular">${fmt(tx.amount)}</span>
+                <button class="btn btn-sm btn-ghost" title="Delete" onclick="deleteTx('${tx.id}')">&times;</button>
+              </div>
+            </div>
+            <div class="bin-pills">
+              ${state.bins.map(b => `
+                <button class="bin-pill" onclick="assignBin('${tx.id}', '${b.id}')">${escapeHtml(b.name)}</button>
+              `).join('')}
+            </div>
+          </div>
+        `).join('')}
+      `;
+    }
+
+    // 2. OVERVIEW LEDGER
+    function renderOverview(main) {
+      const totalBudget = state.bins.reduce((s, b) => s + Number(b.budget), 0);
+      const binnedTxs = state.transactions.filter(t => t.binId);
+      const totalSpent = binnedTxs.reduce((s, t) => s + Number(t.amount), 0);
+      const unbinnedTotal = state.transactions.filter(t => !t.binId).reduce((s, t) => s + Number(t.amount), 0);
+
+      const filtered = binnedTxs
+        .filter(t => filterBin === 'all' || t.binId === filterBin)
+        .filter(t => !searchQuery || t.merchant.toLowerCase().includes(searchQuery.toLowerCase()))
+        .sort((a, b) => b.date.localeCompare(a.date));
+
+      main.innerHTML = `
+        <div class="page-header">
+          <div>
+            <h2 class="page-title">Monthly Specimen Overview</h2>
+            <div class="page-meta">Budget tracking &amp; categorized ledger</div>
+          </div>
+          <div class="header-actions">
+            <button class="btn" onclick="openChaseImportModal()">Import Chase CSV / Paste</button>
+            <button class="btn" onclick="openEditBinsModal()">Edit Bins</button>
+            <button class="btn btn-primary" onclick="openAddPurchaseModal()">+ Log Purchase</button>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-box">
+            <div class="stat-label">Total Binned Spent</div>
+            <div class="stat-value tabular">${fmt(totalSpent)}</div>
+            <div class="stat-sub">of ${fmt(totalBudget)} monthly budget</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Budget Remaining</div>
+            <div class="stat-value tabular" style="color:${totalBudget - totalSpent < 0 ? 'var(--danger)' : 'var(--accent)'}">
+              ${fmt(totalBudget - totalSpent)}
+            </div>
+            <div class="stat-sub">${Math.round((totalSpent / (totalBudget || 1)) * 100)}% utilized</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Unbinned Queue</div>
+            <div class="stat-value tabular">${fmt(unbinnedTotal)}</div>
+            <div class="stat-sub">${state.transactions.filter(t => !t.binId).length} items pending</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <h3 class="panel-title">Bins Breakdown</h3>
+            <button class="btn btn-sm" onclick="openEditBinsModal()">+ Add / Edit Bins</button>
+          </div>
+          <div class="bins-grid">
+            ${state.bins.map(b => {
+              const spent = getBinSpent(b.id);
+              const pct = Math.min(100, Math.round((spent / (b.budget || 1)) * 100));
+              const fillClass = spent > b.budget ? 'danger' : pct >= 80 ? 'warn' : '';
+              return `
+                <div class="bin-card">
+                  <div style="display:flex; justify-content:space-between; font-weight:700;">
+                    <span>${escapeHtml(b.name)}</span>
+                    <span class="tabular">${fmt(spent)} / ${fmt(b.budget)}</span>
+                  </div>
+                  <div class="bar-track">
+                    <div class="bar-fill ${fillClass}" style="width:${pct}%"></div>
+                  </div>
+                  <div style="font-size:12px; color:var(--ink-muted); margin-top:6px;">
+                    ${spent > b.budget ? `${fmt(spent - b.budget)} over budget` : `${fmt(b.budget - spent)} remaining`}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <h3 class="panel-title">Binned Ledger</h3>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <input type="text" placeholder="Search merchant..." value="${escapeHtml(searchQuery)}" oninput="searchQuery=this.value; renderOverview(document.getElementById('main-content'))" />
+              <select onchange="filterBin=this.value; renderOverview(document.getElementById('main-content'))">
+                <option value="all">All Bins</option>
+                ${state.bins.map(b => `<option value="${b.id}" ${filterBin === b.id ? 'selected' : ''}>${escapeHtml(b.name)}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Merchant</th>
+                  <th>Bin</th>
+                  <th class="num">Amount</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                ${filtered.length === 0 ? `<tr><td colspan="5" style="text-align:center; color:var(--ink-muted); padding:20px;">No binned transactions match your filter.</td></tr>` :
+                  filtered.map(t => {
+                    const bin = state.bins.find(b => b.id === t.binId);
+                    return `
+                      <tr>
+                        <td class="tabular">${t.date}</td>
+                        <td><strong>${escapeHtml(t.merchant)}</strong></td>
+                        <td><span class="tag">${bin ? escapeHtml(bin.name) : 'Unknown'}</span></td>
+                        <td class="num tabular">${fmt(t.amount)}</td>
+                        <td class="num">
+                          <button class="btn btn-sm btn-ghost" onclick="unbinTx('${t.id}')">Unbin</button>
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    // 3. PLAN & PAYCHECK SPLITS
+    function getBillCoveredTotal(billId) {
+      let sum = 0;
+      state.paychecks.forEach(p => {
+        p.allocations.forEach(a => {
+          if (a.targetType === 'bill' && a.targetId === billId) sum += Number(a.amount);
+        });
+      });
+      return sum;
+    }
+
+    function renderPlan(main) {
+      const sortedBills = [...state.bills].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+
+      main.innerHTML = `
+        <div class="page-header">
+          <div>
+            <h2 class="page-title">Plan &amp; Paycheck Splits</h2>
+            <div class="page-meta">Allocate paychecks across bills &amp; spending bins</div>
+          </div>
+          <div class="header-actions">
+            <button class="btn" onclick="openCoverageModal()">Bill Coverage Overview</button>
+            <button class="btn" onclick="openAddBillModal()">+ Add Bill</button>
+            <button class="btn btn-primary" onclick="openAddPaycheckModal()">+ Add Paycheck</button>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <!-- Left: Bills -->
+          <div class="panel">
+            <div class="panel-header">
+              <h3 class="panel-title">Upcoming Bills</h3>
+              <button class="btn btn-sm" onclick="openCoverageModal()">Coverage</button>
+            </div>
+            ${sortedBills.length === 0 ? `<div style="color:var(--ink-muted);">No bills added yet.</div>` :
+              sortedBills.map(b => {
+                const covered = getBillCoveredTotal(b.id);
+                const pct = Math.min(100, Math.round((covered / (b.amount || 1)) * 100));
+                return `
+                  <div style="padding:12px 0; border-bottom:1px solid var(--rule);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                      <div>
+                        <strong>${escapeHtml(b.name)}</strong>
+                        ${b.paid ? `<span class="tag tag-paid">Paid</span>` : ''}
+                        <div style="font-size:12px; color:var(--ink-muted);">Due ${b.dueDate} ${b.recurring ? '• Monthly' : '• One-off'}</div>
+                      </div>
+                      <div style="text-align:right;">
+                        <div class="tabular" style="font-weight:700;">${fmt(b.amount)}</div>
+                        <div style="font-size:11px; color:var(--ink-muted);">Covered: ${fmt(covered)}</div>
+                      </div>
+                    </div>
+                    <div class="bar-track">
+                      <div class="bar-fill" style="width:${pct}%"></div>
+                    </div>
+                    <div style="display:flex; gap:6px; margin-top:8px;">
+                      <button class="btn btn-sm" onclick="toggleBillPaid('${b.id}')">
+                        ${b.paid ? 'Undo Paid' : (b.recurring ? 'Mark Paid & Roll Next Month' : 'Mark Paid')}
+                      </button>
+                      <button class="btn btn-sm btn-ghost" onclick="deleteBill('${b.id}')">Remove</button>
+                    </div>
+                  </div>
+                `;
+              }).join('')
+            }
+          </div>
+
+          <!-- Right: Paychecks -->
+          <div>
+            ${state.paychecks.length === 0 ? `
+              <div class="panel">
+                <div style="color:var(--ink-muted); margin-bottom:10px;">No paychecks added yet.</div>
+                <button class="btn btn-primary" onclick="openAddPaycheckModal()">+ Add Paycheck</button>
+              </div>
+            ` : state.paychecks.map(p => {
+              const assigned = p.allocations.reduce((s, a) => s + Number(a.amount), 0);
+              const left = Number(p.amount) - assigned;
+              return `
+                <div class="paycheck-card">
+                  <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:10px;">
+                    <div>
+                      <div style="font-weight:700; font-size:16px;">${escapeHtml(p.label)}</div>
+                      <div class="tabular" style="font-size:12px; color:var(--ink-muted);">Total: ${fmt(p.amount)}</div>
+                    </div>
+                    <div style="text-align:right;">
+                      <div style="font-size:11px; text-transform:uppercase; color:var(--ink-muted);">Left to Assign</div>
+                      <div class="tabular" style="font-size:18px; font-weight:700; color:${left < 0 ? 'var(--danger)' : 'var(--accent)'}">
+                        ${fmt(left)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px;">
+                    <button class="btn btn-sm btn-accent" onclick="coverBillsFirst('${p.id}')">Cover Bills First</button>
+                    <button class="btn btn-sm" onclick="openAddSplitModal('${p.id}')">+ Add Split Line</button>
+                    <button class="btn btn-sm btn-ghost" onclick="deletePaycheck('${p.id}')">Delete</button>
+                  </div>
+
+                  <div>
+                    ${p.allocations.length === 0 ? `<div style="font-size:12px; color:var(--ink-muted);">No allocations yet.</div>` :
+                      p.allocations.map(a => {
+                        let label = 'Unknown';
+                        let extraInfo = '';
+                        let canCoverRest = false;
+                        if (a.targetType === 'bill') {
+                          const bill = state.bills.find(b => b.id === a.targetId);
+                          if (bill) {
+                            label = `Bill: ${bill.name}`;
+                            const totalCov = getBillCoveredTotal(bill.id);
+                            const rem = Math.max(0, bill.amount - totalCov);
+                            extraInfo = `Covered ${fmt(totalCov)} of ${fmt(bill.amount)}`;
+                            if (rem > 0 && left > 0) canCoverRest = true;
+                          }
+                        } else {
+                          const bin = state.bins.find(b => b.id === a.targetId);
+                          if (bin) label = `Bin: ${bin.name}`;
+                        }
+                        return `
+                          <div class="split-row">
+                            <div>
+                              <div style="font-weight:600;">${escapeHtml(label)}</div>
+                              ${extraInfo ? `<div style="font-size:11px; color:var(--ink-muted);">${extraInfo}</div>` : ''}
+                            </div>
+                            <div style="display:flex; align-items:center; gap:6px;">
+                              ${canCoverRest ? `<button class="btn btn-sm" onclick="coverRestOnLine('${p.id}', '${a.id}')">Cover rest</button>` : ''}
+                              <span class="tabular" style="font-weight:700;">${fmt(a.amount)}</span>
+                              <button class="btn btn-sm btn-ghost" onclick="removeSplit('${p.id}', '${a.id}')">&times;</button>
+                            </div>
+                          </div>
+                        `;
+                      }).join('')
+                    }
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function toggleBillPaid(billId) {
+      const bill = state.bills.find(b => b.id === billId);
+      if (!bill) return;
+      if (!bill.paid && bill.recurring) {
+        const d = new Date(bill.dueDate + 'T00:00:00');
+        d.setMonth(d.getMonth() + 1);
+        bill.dueDate = d.toISOString().slice(0, 10);
+        showToast(`${bill.name} marked paid and rolled to ${bill.dueDate}.`);
+      } else {
+        bill.paid = !bill.paid;
+      }
+      saveState();
+      render();
+    }
+
+    function deleteBill(billId) {
+      state.bills = state.bills.filter(b => b.id !== billId);
+      state.paychecks.forEach(p => {
+        p.allocations = p.allocations.filter(a => !(a.targetType === 'bill' && a.targetId === billId));
+      });
+      saveState();
+      render();
+    }
+
+    function deletePaycheck(pId) {
+      state.paychecks = state.paychecks.filter(p => p.id !== pId);
+      saveState();
+      render();
+    }
+
+    function removeSplit(pId, aId) {
+      const p = state.paychecks.find(x => x.id === pId);
+      if (!p) return;
+      p.allocations = p.allocations.filter(a => a.id !== aId);
+      saveState();
+      render();
+    }
+
+    function coverRestOnLine(pId, aId) {
+      const p = state.paychecks.find(x => x.id === pId);
+      if (!p) return;
+      const line = p.allocations.find(a => a.id === aId);
+      if (!line || line.targetType !== 'bill') return;
+      const bill = state.bills.find(b => b.id === line.targetId);
+      if (!bill) return;
+
+      const assigned = p.allocations.reduce((s, a) => s + Number(a.amount), 0);
+      const paycheckLeft = Math.max(0, Number(p.amount) - assigned);
+      const billRemaining = Math.max(0, Number(bill.amount) - getBillCoveredTotal(bill.id));
+      const add = Math.min(paycheckLeft, billRemaining);
+
+      if (add > 0) {
+        line.amount = Number(line.amount) + add;
+        saveState();
+        showToast(`Added ${fmt(add)} to cover ${bill.name}.`);
+        render();
+      }
+    }
+
+    function coverBillsFirst(pId) {
+      const p = state.paychecks.find(x => x.id === pId);
+      if (!p) return;
+      let assigned = p.allocations.reduce((s, a) => s + Number(a.amount), 0);
+      let left = Number(p.amount) - assigned;
+      if (left <= 0) {
+        showToast('No remaining funds on this paycheck.');
+        return;
+      }
+
+      const sortedBills = [...state.bills].filter(b => !b.paid).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+      let addedCount = 0;
+
+      for (const bill of sortedBills) {
+        if (left <= 0) break;
+        const covered = getBillCoveredTotal(bill.id);
+        const needed = Number(bill.amount) - covered;
+        if (needed > 0) {
+          const put = Math.min(left, needed);
+          const existing = p.allocations.find(a => a.targetType === 'bill' && a.targetId === bill.id);
+          if (existing) existing.amount = Number(existing.amount) + put;
+          else p.allocations.push({ id: uid('a'), targetType: 'bill', targetId: bill.id, amount: put });
+          left -= put;
+          addedCount++;
+        }
+      }
+
+      saveState();
+      showToast(addedCount > 0 ? `Allocated funds across ${addedCount} uncovered bill(s).` : 'All unpaid bills are already covered!');
+      render();
+    }
+
+    // 4. DEBTS & LOANS CALCULATOR
+    function calculatePayoff(balance, apr, monthlyPayment) {
+      if (balance <= 0) return { months: 0, totalInterest: 0, underwater: false, payoffDate: 'Paid off' };
+      const r = (apr / 100) / 12;
+      if (r > 0 && monthlyPayment <= balance * r) {
+        return { months: Infinity, totalInterest: Infinity, underwater: true, payoffDate: 'Never' };
+      }
+      let bal = balance;
+      let months = 0;
+      let totalInterest = 0;
+      while (bal > 0.005 && months < 1200) {
+        const interest = bal * r;
+        totalInterest += interest;
+        bal = bal + interest - monthlyPayment;
+        months++;
+      }
+      const d = new Date();
+      d.setMonth(d.getMonth() + months);
+      const payoffDate = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      return { months, totalInterest, underwater: false, payoffDate };
+    }
+
+    function renderDebts(main) {
+      const totalDebt = state.debts.reduce((s, d) => s + Number(d.balance), 0);
+      const totalMin = state.debts.reduce((s, d) => s + Number(d.payment), 0);
+
+      main.innerHTML = `
+        <div class="page-header">
+          <div>
+            <h2 class="page-title">Debts &amp; Loans</h2>
+            <div class="page-meta">Payoff timeline, APR interest cost &amp; extra payment simulator</div>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-primary" onclick="openAddDebtModal()">+ Add Debt / Loan</button>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-box">
+            <div class="stat-label">Total Principal Balance</div>
+            <div class="stat-value tabular">${fmt(totalDebt)}</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Total Monthly Payments</div>
+            <div class="stat-value tabular">${fmt(totalMin + Number(extraDebtPayment))}</div>
+            <div class="stat-sub">Base: ${fmt(totalMin)} + Extra: ${fmt(extraDebtPayment)}</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Extra Monthly Simulator</div>
+            <div style="display:flex; align-items:center; gap:8px; margin-top:6px;">
+              <span>+$</span>
+              <input type="number" min="0" step="25" value="${extraDebtPayment}" style="width:100px;"
+                oninput="extraDebtPayment=Math.max(0, Number(this.value)); renderDebts(document.getElementById('main-content'))" />
+              <span style="font-size:12px; color:var(--ink-muted);">/mo</span>
+            </div>
+          </div>
+        </div>
+
+        ${state.debts.length === 0 ? `
+          <div class="panel" style="text-align:center; padding:30px;">
+            <div style="color:var(--ink-muted); margin-bottom:12px;">No debts or loans logged yet.</div>
+            <button class="btn btn-primary" onclick="openAddDebtModal()">+ Add Debt / Loan</button>
+          </div>
+        ` : state.debts.map((d) => {
+          const highestAprId = [...state.debts].sort((a, b) => b.apr - a.apr)[0]?.id;
+          const simExtra = (d.id === highestAprId) ? Number(extraDebtPayment) : 0;
+          const res = calculatePayoff(Number(d.balance), Number(d.apr), Number(d.payment) + simExtra);
+          const yrs = Math.floor(res.months / 12);
+          const mos = res.months % 12;
+          const durationText = res.underwater ? 'Never (payment too low)' :
+            `${yrs > 0 ? yrs + ' yr ' : ''}${mos} mo`;
+
+          return `
+            <div class="panel">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+                <div>
+                  <div style="font-size:18px; font-weight:700;">${escapeHtml(d.name)}</div>
+                  <div class="tabular" style="font-size:13px; color:var(--ink-muted); margin-top:2px;">
+                    Balance: <strong>${fmt(d.balance)}</strong> &bull; APR: <strong>${d.apr}%</strong> &bull; Payment: <strong>${fmt(Number(d.payment) + simExtra)}/mo</strong>
+                    ${simExtra > 0 ? `<span class="tag tag-paid">Includes +${fmt(simExtra)} extra</span>` : ''}
+                  </div>
+                </div>
+                <button class="btn btn-sm btn-ghost" onclick="deleteDebt('${d.id}')">Remove</button>
+              </div>
+
+              ${res.underwater ? `
+                <div style="margin-top:12px; padding:10px 12px; background:var(--danger-soft); border:1px solid var(--danger); border-radius:5px; color:var(--danger); font-weight:600;">
+                  Warning: Your monthly payment (${fmt(d.payment)}) does not cover the monthly interest (${fmt(d.balance * (d.apr/100)/12)}). Increase payment to pay off this balance.
+                </div>
+              ` : `
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:12px; margin-top:14px; padding-top:12px; border-top:1px solid var(--rule);">
+                  <div>
+                    <div class="stat-label">Debt-Free Date</div>
+                    <div style="font-size:17px; font-weight:700; color:var(--accent);">${res.payoffDate}</div>
+                  </div>
+                  <div>
+                    <div class="stat-label">Payoff Duration</div>
+                    <div class="tabular" style="font-size:17px; font-weight:700;">${durationText}</div>
+                  </div>
+                  <div>
+                    <div class="stat-label">Total Interest Cost</div>
+                    <div class="tabular" style="font-size:17px; font-weight:700;">${fmt(res.totalInterest)}</div>
+                  </div>
+                </div>
+              `}
+            </div>
+          `;
+        }).join('')}
+      `;
+    }
+
+    function deleteDebt(id) {
+      state.debts = state.debts.filter(d => d.id !== id);
+      saveState();
+      render();
+    }
+
+    // MODALS
+    function openModal(html) {
+      const root = document.getElementById('modal-root');
+      root.innerHTML = `<div class="modal-backdrop" onclick="if(event.target===this) closeModal()"><div class="modal">${html}</div></div>`;
+      root.classList.remove('hidden');
+    }
+
+    function closeModal() {
+      const root = document.getElementById('modal-root');
+      root.classList.add('hidden');
+      root.innerHTML = '';
+    }
+
+    function openAddPurchaseModal() {
+      const today = new Date().toISOString().slice(0, 10);
+      openModal(`
+        <h3 style="margin-top:0; font-family:var(--serif);">Log a Purchase</h3>
+        <div class="form-grid">
+          <div class="field">
+            <label>Merchant / Item</label>
+            <input id="m-merchant" type="text" placeholder="e.g. Card Kingdom" />
+          </div>
+          <div class="field">
+            <label>Amount ($)</label>
+            <input id="m-amount" type="number" step="0.01" placeholder="25.00" />
+          </div>
+          <div class="field">
+            <label>Date</label>
+            <input id="m-date" type="date" value="${today}" />
+          </div>
+          <div class="field">
+            <label>Bin (Optional)</label>
+            <select id="m-bin">
+              <option value="">Leave in To Bin Queue</option>
+              ${state.bins.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:8px;">
+          <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="submitPurchase()">Save Purchase</button>
+        </div>
+      `);
+    }
+
+    function submitPurchase() {
+      const merchant = document.getElementById('m-merchant').value.trim();
+      const amount = parseFloat(document.getElementById('m-amount').value);
+      const date = document.getElementById('m-date').value || new Date().toISOString().slice(0, 10);
+      const binId = document.getElementById('m-bin').value || null;
+      if (!merchant || isNaN(amount) || amount <= 0) return alert('Enter a merchant and valid amount.');
+      state.transactions.unshift({ id: uid('t'), date, merchant, amount, binId });
+      saveState();
+      closeModal();
+      showToast(binId ? 'Purchase logged and binned.' : 'Added to To Bin queue.');
+      render();
+    }
+
+    function openChaseImportModal() {
+      openModal(`
+        <h3 style="margin-top:0; font-family:var(--serif);">Import Chase Purchases</h3>
+        <p style="font-size:13px; color:var(--ink-muted);">
+          Upload a <strong>Chase CSV file</strong> (downloaded from chase.com on desktop) OR simply <strong>highlight &amp; copy</strong> your recent transactions from the Chase website and paste them below.
+        </p>
+        <div class="field" style="margin-bottom:12px;">
+          <label>Option 1: Upload Chase CSV</label>
+          <input type="file" accept=".csv" onchange="handleCsvUpload(event)" />
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <label>Option 2: Paste Copied Chase Rows</label>
+          <textarea id="chase-paste" rows="6" placeholder="Nov 16, 2026  CARD KINGDOM  -$42.50&#10;11/15/2026,KEWEENAW BREWING,-18.50"></textarea>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:8px;">
+          <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="parsePastedChase()">Import to Queue</button>
+        </div>
+      `);
+    }
+
+    function handleCsvUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        document.getElementById('chase-paste').value = reader.result;
+      };
+      reader.readAsText(file);
+    }
+
+    function parsePastedChase() {
+      const raw = document.getElementById('chase-paste').value.trim();
+      if (!raw) return;
+      const lines = raw.split(/\r?\n/);
+      let added = 0;
+
+      lines.forEach(line => {
+        if (!line.trim() || /transaction date|details|description/i.test(line)) return;
+        const cols = line.includes(',') ? line.split(',').map(c => c.replace(/^"|"$/g, '').trim()) : line.split(/\t|\s{2,}/);
+        const amountMatch = line.match(/-?\$?\d[\d,]*\.\d{2}/);
+        if (!amountMatch) return;
+
+        let num = parseFloat(amountMatch[0].replace(/[$,]/g, ''));
+        if (line.includes(',') && num > 0) return;
+        const amount = Math.abs(num);
+        if (amount <= 0) return;
+
+        let date = new Date().toISOString().slice(0, 10);
+        const slashDate = line.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+        if (slashDate) {
+          date = `${slashDate[3]}-${slashDate[1].padStart(2, '0')}-${slashDate[2].padStart(2, '0')}`;
+        }
+
+        let merchant = cols.find(c => c && !/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(c) && !/^(DEBIT|CREDIT|SALE|RETURN)$/i.test(c) && !/^-?\$?\d/.test(c)) || 'Chase Purchase';
+        state.transactions.unshift({ id: uid('t'), date, merchant, amount, binId: null });
+        added++;
+      });
+
+      saveState();
+      closeModal();
+      showToast(`Imported ${added} purchase(s) into To Bin queue.`);
+      render();
+    }
+
+    function openEditBinsModal() {
+      openModal(`
+        <h3 style="margin-top:0; font-family:var(--serif);">Edit Spending Bins</h3>
+        <div id="bins-editor-list">
+          ${state.bins.map((b, i) => `
+            <div style="display:flex; gap:8px; margin-bottom:8px;">
+              <input type="text" value="${escapeHtml(b.name)}" data-idx="${i}" class="bin-name-in" style="flex:1;" />
+              <input type="number" value="${b.budget}" data-idx="${i}" class="bin-bud-in" style="width:110px;" />
+            </div>
+          `).join('')}
+        </div>
+        <div style="border-top:1px solid var(--rule); padding-top:12px; margin-top:12px;">
+          <div style="font-size:12px; font-weight:700; margin-bottom:6px;">Add New Bin</div>
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="new-bin-name" placeholder="Bin name" style="flex:1;" />
+            <input type="number" id="new-bin-bud" placeholder="Budget $" style="width:110px;" />
+            <button class="btn" onclick="addNewBin()">Add</button>
+          </div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+          <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="saveBinsEdits()">Save Bins</button>
+        </div>
+      `);
+    }
+
+    function addNewBin() {
+      const name = document.getElementById('new-bin-name').value.trim();
+      const budget = parseFloat(document.getElementById('new-bin-bud').value) || 0;
+      if (!name) return;
+      state.bins.push({ id: uid('bin'), name, budget });
+      saveState();
+      openEditBinsModal();
+    }
+
+    function saveBinsEdits() {
+      document.querySelectorAll('.bin-name-in').forEach(inp => {
+        const idx = Number(inp.dataset.idx);
+        if (inp.value.trim()) state.bins[idx].name = inp.value.trim();
+      });
+      document.querySelectorAll('.bin-bud-in').forEach(inp => {
+        const idx = Number(inp.dataset.idx);
+        state.bins[idx].budget = Math.max(0, parseFloat(inp.value) || 0);
+      });
+      saveState();
+      closeModal();
+      render();
+    }
+
+    function openAddBillModal() {
+      openModal(`
+        <h3 style="margin-top:0; font-family:var(--serif);">Add Bill</h3>
+        <div class="form-grid">
+          <div class="field"><label>Bill Name</label><input id="b-name" placeholder="e.g. Electric" /></div>
+          <div class="field"><label>Amount ($)</label><input id="b-amt" type="number" step="0.01" placeholder="120.00" /></div>
+          <div class="field"><label>Due Date</label><input id="b-due" type="date" value="${new Date().toISOString().slice(0,10)}" /></div>
+          <div class="field"><label>Frequency</label>
+            <select id="b-rec"><option value="true">Monthly Recurring</option><option value="false">One-off</option></select>
+          </div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:8px;">
+          <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="submitBill()">Save Bill</button>
+        </div>
+      `);
+    }
+
+    function submitBill() {
+      const name = document.getElementById('b-name').value.trim();
+      const amount = parseFloat(document.getElementById('b-amt').value);
+      const dueDate = document.getElementById('b-due').value;
+      const recurring = document.getElementById('b-rec').value === 'true';
+      if (!name || isNaN(amount) || amount <= 0) return;
+      state.bills.push({ id: uid('b'), name, amount, dueDate, recurring, paid: false });
+      saveState();
+      closeModal();
+      render();
+    }
+
+    function openAddPaycheckModal() {
+      openModal(`
+        <h3 style="margin-top:0; font-family:var(--serif);">Add Incoming Paycheck</h3>
+        <div class="form-grid">
+          <div class="field"><label>Label / Date</label><input id="p-label" placeholder="e.g. Paycheck Dec 15" /></div>
+          <div class="field"><label>Net Amount ($)</label><input id="p-amt" type="number" step="0.01" placeholder="1650.00" /></div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:8px;">
+          <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="submitPaycheck()">Save Paycheck</button>
+        </div>
+      `);
+    }
+
+    function submitPaycheck() {
+      const label = document.getElementById('p-label').value.trim();
+      const amount = parseFloat(document.getElementById('p-amt').value);
+      if (!label || isNaN(amount) || amount <= 0) return;
+      state.paychecks.push({ id: uid('p'), label, amount, allocations: [] });
+      saveState();
+      closeModal();
+      render();
+    }
+
+    function openAddSplitModal(pId) {
+      openModal(`
+        <h3 style="margin-top:0; font-family:var(--serif);">Allocate Paycheck Funds</h3>
+        <div class="form-grid">
+          <div class="field">
+            <label>Target</label>
+            <select id="s-target">
+              <optgroup label="Bills">
+                ${state.bills.map(b => `<option value="bill:${b.id}">${escapeHtml(b.name)} (${fmt(b.amount)})</option>`).join('')}
+              </optgroup>
+              <optgroup label="Spending Bins">
+                ${state.bins.map(b => `<option value="bin:${b.id}">${escapeHtml(b.name)}</option>`).join('')}
+              </optgroup>
+            </select>
+          </div>
+          <div class="field">
+            <label>Amount ($)</label>
+            <input id="s-amt" type="number" step="0.01" placeholder="250.00" />
+          </div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:8px;">
+          <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="submitSplit('${pId}')">Add Allocation</button>
+        </div>
+      `);
+    }
+
+    function submitSplit(pId) {
+      const p = state.paychecks.find(x => x.id === pId);
+      if (!p) return;
+      const [targetType, targetId] = document.getElementById('s-target').value.split(':');
+      const amount = parseFloat(document.getElementById('s-amt').value);
+      if (isNaN(amount) || amount <= 0) return;
+      p.allocations.push({ id: uid('a'), targetType, targetId, amount });
+      saveState();
+      closeModal();
+      render();
+    }
+
+    function openCoverageModal() {
+      openModal(`
+        <h3 style="margin-top:0; font-family:var(--serif);">All Bills &amp; Paycheck Coverage</h3>
+        ${state.bills.map(b => {
+          const covered = getBillCoveredTotal(b.id);
+          const pct = Math.min(100, Math.round((covered / (b.amount || 1)) * 100));
+          return `
+            <div style="margin-bottom:14px;">
+              <div style="display:flex; justify-content:space-between; font-weight:600;">
+                <span>${escapeHtml(b.name)} (Due ${b.dueDate})</span>
+                <span class="tabular">${fmt(covered)} / ${fmt(b.amount)} (${pct}%)</span>
+              </div>
+              <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+            </div>
+          `;
+        }).join('')}
+        <div style="display:flex; justify-content:flex-end; margin-top:16px;">
+          <button class="btn btn-primary" onclick="closeModal()">Done</button>
+        </div>
+      `);
+    }
+
+    function openAddDebtModal() {
+      openModal(`
+        <h3 style="margin-top:0; font-family:var(--serif);">Add Debt or Loan</h3>
+        <div class="form-grid">
+          <div class="field"><label>Name</label><input id="d-name" placeholder="e.g. Student Loan" /></div>
+          <div class="field"><label>Current Balance ($)</label><input id="d-bal" type="number" step="0.01" placeholder="5000" /></div>
+          <div class="field"><label>Interest Rate (APR %)</label><input id="d-apr" type="number" step="0.01" placeholder="6.5" /></div>
+          <div class="field"><label>Monthly Payment ($)</label><input id="d-pay" type="number" step="0.01" placeholder="180" /></div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:8px;">
+          <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="submitDebt()">Save Debt</button>
+        </div>
+      `);
+    }
+
+    function submitDebt() {
+      const name = document.getElementById('d-name').value.trim();
+      const balance = parseFloat(document.getElementById('d-bal').value);
+      const apr = parseFloat(document.getElementById('d-apr').value) || 0;
+      const payment = parseFloat(document.getElementById('d-pay').value);
+      if (!name || isNaN(balance) || isNaN(payment) || payment <= 0) return;
+      state.debts.push({ id: uid('d'), name, balance, apr, payment });
+      saveState();
+      closeModal();
+      render();
+    }
+
+    // JSON Backup & Restore
+    function exportBackup() {
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `binned-backup-${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function triggerRestore() {
+      document.getElementById('restore-input').click();
+    }
+
+    function importBackup(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const parsed = JSON.parse(reader.result);
+          if (parsed.bins && parsed.transactions) {
+            state = parsed;
+            saveState();
+            render();
+            showToast('Backup restored successfully.');
+          }
+        } catch (err) {
+          alert('Invalid backup JSON file.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s]));
+    }
+
+    render();
+  </script>
+</body>
+</html>
