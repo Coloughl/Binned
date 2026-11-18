@@ -41,26 +41,27 @@
     /* Layout Shell */
     .app-shell {
       display: grid;
-      grid-template-columns: 230px 1fr;
+      grid-template-columns: 245px 1fr;
       min-height: 100vh;
     }
 
     .sidebar {
       background: var(--paper-elevated);
       border-right: 1px solid var(--rule);
-      padding: 24px 18px;
+      padding: 22px 18px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       position: sticky;
       top: 0;
       height: 100vh;
+      overflow-y: auto;
     }
 
     .brand {
       border-bottom: 2px solid var(--rule-strong);
       padding-bottom: 14px;
-      margin-bottom: 20px;
+      margin-bottom: 18px;
     }
     .brand-title {
       font-family: var(--serif);
@@ -125,12 +126,35 @@
       padding-top: 14px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 7px;
     }
+
+    .sync-pill {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      padding: 6px 9px;
+      border-radius: 5px;
+      background: var(--paper-muted);
+      border: 1px solid var(--rule);
+      color: var(--ink-muted);
+      margin-bottom: 4px;
+    }
+    .sync-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #999;
+      display: inline-block;
+      margin-right: 6px;
+    }
+    .sync-dot.online { background: var(--accent); }
+    .sync-dot.syncing { background: var(--warn); }
 
     .main {
       padding: 28px 34px 60px;
-      max-width: 1120px;
+      max-width: 1140px;
       width: 100%;
     }
 
@@ -160,7 +184,36 @@
     .header-actions {
       display: flex;
       flex-wrap: wrap;
+      align-items: center;
       gap: 8px;
+    }
+
+    /* Month Switcher */
+    .month-bar {
+      display: inline-flex;
+      align-items: center;
+      background: var(--paper-elevated);
+      border: 1px solid var(--rule-strong);
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .month-bar button {
+      border: none;
+      background: transparent;
+      padding: 7px 11px;
+      font-weight: 700;
+      cursor: pointer;
+      color: var(--ink);
+    }
+    .month-bar button:hover { background: var(--paper-muted); }
+    .month-label {
+      padding: 6px 12px;
+      font-weight: 700;
+      font-size: 13px;
+      border-left: 1px solid var(--rule);
+      border-right: 1px solid var(--rule);
+      min-width: 120px;
+      text-align: center;
     }
 
     /* Buttons */
@@ -168,7 +221,7 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 8px 14px;
+      padding: 8px 13px;
       font-size: 13px;
       font-weight: 600;
       border-radius: 5px;
@@ -190,6 +243,11 @@
       color: #fff;
     }
     .btn-accent:hover { background: #163d30; }
+    .btn-danger-outline {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+    .btn-danger-outline:hover { background: var(--danger-soft); }
     .btn-sm { padding: 4px 9px; font-size: 12px; }
     .btn-ghost { border-color: var(--rule); color: var(--ink-muted); }
 
@@ -205,6 +263,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      flex-wrap: wrap;
       gap: 12px;
       border-bottom: 1px solid var(--rule);
       padding-bottom: 10px;
@@ -220,7 +279,7 @@
 
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
       gap: 14px;
       margin-bottom: 22px;
     }
@@ -237,14 +296,14 @@
       color: var(--ink-muted);
     }
     .stat-value {
-      font-size: 22px;
+      font-size: 21px;
       font-weight: 700;
       margin-top: 4px;
     }
     .stat-sub {
       font-size: 12px;
       color: var(--ink-muted);
-      margin-top: 2px;
+      margin-top: 3px;
     }
 
     /* Queue Items & Bin Pills */
@@ -416,7 +475,7 @@
       background: var(--paper-elevated);
       border: 2px solid var(--rule-strong);
       border-radius: 8px;
-      max-width: 560px;
+      max-width: 580px;
       width: 100%;
       max-height: 90vh;
       overflow-y: auto;
@@ -463,7 +522,12 @@
       .brand { margin-bottom: 10px; padding-bottom: 8px; }
       .nav-list { flex-direction: row; flex-wrap: wrap; }
       .nav-btn { width: auto; padding: 7px 11px; font-size: 13px; }
-      .sidebar-footer { display: none; }
+      .sidebar-footer {
+        flex-direction: row;
+        flex-wrap: wrap;
+        margin-top: 10px;
+        padding-top: 10px;
+      }
       .main { padding: 18px 16px 60px; }
       .two-col { grid-template-columns: 1fr; }
     }
@@ -494,8 +558,13 @@
         </nav>
       </div>
       <div class="sidebar-footer">
+        <div class="sync-pill" id="sync-status">
+          <span><span class="sync-dot" id="sync-dot"></span><span id="sync-text">Local Only</span></span>
+          <button class="btn btn-sm" style="padding:2px 7px;" onclick="openCloudSyncModal()">Sync</button>
+        </div>
         <button class="btn btn-sm" onclick="exportBackup()">Export JSON Backup</button>
         <button class="btn btn-sm btn-ghost" onclick="triggerRestore()">Restore Backup</button>
+        <button class="btn btn-sm btn-danger-outline" onclick="clearSampleData()">Start Fresh (Clear Data)</button>
         <input type="file" id="restore-input" accept=".json" class="hidden" onchange="importBackup(event)" />
       </div>
     </aside>
@@ -510,9 +579,19 @@
   <div id="toast" class="toast hidden"></div>
 
   <script>
-    const STORAGE_KEY = 'binned_ledger_v1';
+    const STORAGE_KEY = 'binned_ledger_v2';
+    const CLOUD_CFG_KEY = 'binned_supabase_cfg_v1';
+
+    function getCurrentMonthKey() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }
 
     const DEFAULT_STATE = {
+      defaultMonthlyIncome: 3300,
+      monthlyIncomes: {
+        '2026-11': 3300
+      },
       bins: [
         { id: 'mtg', name: 'MTG Cards', budget: 120 },
         { id: 'beer', name: 'Beer', budget: 80 },
@@ -539,6 +618,7 @@
       paychecks: [
         {
           id: 'p1',
+          month: '2026-11',
           label: 'Paycheck #1 (Nov 15)',
           amount: 1650,
           allocations: [
@@ -549,6 +629,7 @@
         },
         {
           id: 'p2',
+          month: '2026-11',
           label: 'Paycheck #2 (Nov 30)',
           amount: 1650,
           allocations: [
@@ -563,7 +644,9 @@
     };
 
     let state = loadState();
+    let cloudCfg = loadCloudCfg();
     let currentTab = 'queue';
+    let selectedMonth = getCurrentMonthKey();
     let filterBin = 'all';
     let searchQuery = '';
     let extraDebtPayment = 0;
@@ -571,14 +654,122 @@
     function loadState() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) return JSON.parse(raw);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (typeof parsed.defaultMonthlyIncome !== 'number') parsed.defaultMonthlyIncome = 0;
+          if (!parsed.monthlyIncomes) parsed.monthlyIncomes = {};
+          return parsed;
+        }
       } catch (e) {}
       return JSON.parse(JSON.stringify(DEFAULT_STATE));
     }
 
-    function saveState() {
+    function loadCloudCfg() {
+      try {
+        const raw = localStorage.getItem(CLOUD_CFG_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch (e) {}
+      return { url: '', key: '', ledgerKey: '' };
+    }
+
+    function saveCloudCfg(cfg) {
+      cloudCfg = cfg;
+      localStorage.setItem(CLOUD_CFG_KEY, JSON.stringify(cfg));
+      updateSyncUI();
+    }
+
+    function saveState(skipCloud = false) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       updateBadges();
+      if (!skipCloud && isCloudConfigured()) {
+        pushToCloud();
+      }
+    }
+
+    function isCloudConfigured() {
+      return Boolean(cloudCfg && cloudCfg.url && cloudCfg.key && cloudCfg.ledgerKey);
+    }
+
+    function updateSyncUI(statusOverride) {
+      const dot = document.getElementById('sync-dot');
+      const txt = document.getElementById('sync-text');
+      if (!dot || !txt) return;
+      if (!isCloudConfigured()) {
+        dot.className = 'sync-dot';
+        txt.textContent = 'Local Only';
+        return;
+      }
+      if (statusOverride === 'syncing') {
+        dot.className = 'sync-dot syncing';
+        txt.textContent = 'Syncing...';
+      } else if (statusOverride === 'error') {
+        dot.className = 'sync-dot';
+        txt.textContent = 'Sync Error';
+      } else {
+        dot.className = 'sync-dot online';
+        txt.textContent = 'Cloud Synced';
+      }
+    }
+
+    async function pushToCloud() {
+      if (!isCloudConfigured()) return;
+      updateSyncUI('syncing');
+      try {
+        const cleanUrl = cloudCfg.url.replace(/\/$/, '');
+        const res = await fetch(`${cleanUrl}/rest/v1/binned_ledgers?on_conflict=ledger_key`, {
+          method: 'POST',
+          headers: {
+            'apikey': cloudCfg.key,
+            'Authorization': `Bearer ${cloudCfg.key}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=merge-duplicates'
+          },
+          body: JSON.stringify({
+            ledger_key: cloudCfg.ledgerKey,
+            payload: state,
+            updated_at: new Date().toISOString()
+          })
+        });
+        if (!res.ok) throw new Error('Push failed');
+        updateSyncUI('online');
+      } catch (e) {
+        updateSyncUI('error');
+      }
+    }
+
+    async function pullFromCloud(silent = false) {
+      if (!isCloudConfigured()) return;
+      updateSyncUI('syncing');
+      try {
+        const cleanUrl = cloudCfg.url.replace(/\/$/, '');
+        const res = await fetch(
+          `${cleanUrl}/rest/v1/binned_ledgers?ledger_key=eq.${encodeURIComponent(cloudCfg.ledgerKey)}&select=payload`,
+          {
+            headers: {
+              'apikey': cloudCfg.key,
+              'Authorization': `Bearer ${cloudCfg.key}`
+            }
+          }
+        );
+        if (!res.ok) throw new Error('Pull failed');
+        const rows = await res.json();
+        if (rows && rows.length > 0 && rows[0].payload) {
+          state = rows[0].payload;
+          if (typeof state.defaultMonthlyIncome !== 'number') state.defaultMonthlyIncome = 0;
+          if (!state.monthlyIncomes) state.monthlyIncomes = {};
+          saveState(true);
+          render();
+          if (!silent) showToast('Synced latest ledger from cloud.');
+        } else {
+          // First time connecting this ledger key: push local state up
+          await pushToCloud();
+          if (!silent) showToast('Initialized new cloud ledger.');
+        }
+        updateSyncUI('online');
+      } catch (e) {
+        updateSyncUI('error');
+        if (!silent) showToast('Could not connect to Supabase. Check URL, Key, and SQL table.');
+      }
     }
 
     function fmt(n) {
@@ -587,6 +778,36 @@
 
     function uid(prefix = 'id') {
       return prefix + '_' + Math.random().toString(36).slice(2, 9);
+    }
+
+    function formatMonthDisplay(ym) {
+      const [y, m] = ym.split('-').map(Number);
+      const d = new Date(y, m - 1, 1);
+      return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    }
+
+    function shiftMonth(delta) {
+      const [y, m] = selectedMonth.split('-').map(Number);
+      const d = new Date(y, m - 1 + delta, 1);
+      selectedMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      render();
+    }
+
+    function monthSwitcherHtml() {
+      return `
+        <div class="month-bar">
+          <button title="Previous Month" onclick="shiftMonth(-1)">&larr;</button>
+          <span class="month-label">${formatMonthDisplay(selectedMonth)}</span>
+          <button title="Next Month" onclick="shiftMonth(1)">&rarr;</button>
+        </div>
+      `;
+    }
+
+    function getExpectedIncomeForMonth(ym) {
+      if (state.monthlyIncomes && typeof state.monthlyIncomes[ym] === 'number') {
+        return state.monthlyIncomes[ym];
+      }
+      return Number(state.defaultMonthlyIncome || 0);
     }
 
     function showToast(msg) {
@@ -614,9 +835,9 @@
       });
     });
 
-    function getBinSpent(binId) {
+    function getBinSpentForMonth(binId, ym) {
       return state.transactions
-        .filter(t => t.binId === binId)
+        .filter(t => t.binId === binId && t.date && t.date.startsWith(ym))
         .reduce((sum, t) => sum + Number(t.amount), 0);
     }
 
@@ -625,9 +846,10 @@
       const bin = state.bins.find(b => b.id === binId);
       if (!tx || !bin) return;
       tx.binId = binId;
+      const txMonth = (tx.date || selectedMonth).slice(0, 7);
       saveState();
-      const left = bin.budget - getBinSpent(binId);
-      showToast(`Binned to ${bin.name}. ${fmt(left)} left in ${bin.name}.`);
+      const left = bin.budget - getBinSpentForMonth(binId, txMonth);
+      showToast(`Binned to ${bin.name} (${formatMonthDisplay(txMonth)}). ${fmt(left)} left.`);
       render();
     }
 
@@ -646,9 +868,23 @@
       render();
     }
 
+    function clearSampleData() {
+      if (!confirm('Clear all sample transactions, bills, paychecks, and debts so you can start with a clean slate? (Your bin categories will be kept.)')) return;
+      state.transactions = [];
+      state.bills = [];
+      state.paychecks = [];
+      state.debts = [];
+      state.defaultMonthlyIncome = 0;
+      state.monthlyIncomes = {};
+      saveState();
+      showToast('Cleared all sample data. Ready for your real numbers!');
+      render();
+    }
+
     // Render Router
     function render() {
       updateBadges();
+      updateSyncUI();
       const main = document.getElementById('main-content');
       if (currentTab === 'queue') renderQueue(main);
       else if (currentTab === 'overview') renderOverview(main);
@@ -666,7 +902,7 @@
         <div class="page-header">
           <div>
             <h2 class="page-title">To Bin Queue</h2>
-            <div class="page-meta">${queue.length} purchase${queue.length === 1 ? '' : 's'} waiting for a bin</div>
+            <div class="page-meta">${queue.length} purchase${queue.length === 1 ? '' : 's'} waiting for a bin (auto-filed by purchase date)</div>
           </div>
           <div class="header-actions">
             <button class="btn" onclick="openChaseImportModal()">Import Chase CSV / Paste</button>
@@ -685,7 +921,7 @@
             <div class="queue-top">
               <div>
                 <div class="queue-merchant">${escapeHtml(tx.merchant)}</div>
-                <div class="queue-date">${tx.date}</div>
+                <div class="queue-date">${tx.date} &bull; Files into <strong>${formatMonthDisplay((tx.date || selectedMonth).slice(0, 7))}</strong></div>
               </div>
               <div style="display:flex; align-items:center; gap:10px;">
                 <span class="queue-amount tabular">${fmt(tx.amount)}</span>
@@ -702,12 +938,19 @@
       `;
     }
 
-    // 2. OVERVIEW LEDGER
+    // 2. OVERVIEW LEDGER (MONTH-AWARE + EXPECTED INCOME)
     function renderOverview(main) {
+      const expectedIncome = getExpectedIncomeForMonth(selectedMonth);
       const totalBudget = state.bins.reduce((s, b) => s + Number(b.budget), 0);
-      const binnedTxs = state.transactions.filter(t => t.binId);
+      const monthBillsTotal = state.bills
+        .filter(b => b.recurring || (b.dueDate && b.dueDate.startsWith(selectedMonth)))
+        .reduce((s, b) => s + Number(b.amount), 0);
+
+      const binnedTxs = state.transactions.filter(t => t.binId && t.date && t.date.startsWith(selectedMonth));
       const totalSpent = binnedTxs.reduce((s, t) => s + Number(t.amount), 0);
-      const unbinnedTotal = state.transactions.filter(t => !t.binId).reduce((s, t) => s + Number(t.amount), 0);
+      const plannedOutflow = totalBudget + monthBillsTotal;
+      const projectedSavings = expectedIncome - plannedOutflow;
+      const actualLeftFromIncome = expectedIncome - (totalSpent + monthBillsTotal);
 
       const filtered = binnedTxs
         .filter(t => filterBin === 'all' || t.binId === filterBin)
@@ -717,44 +960,50 @@
       main.innerHTML = `
         <div class="page-header">
           <div>
-            <h2 class="page-title">Monthly Specimen Overview</h2>
-            <div class="page-meta">Budget tracking &amp; categorized ledger</div>
+            <h2 class="page-title">Specimen Overview</h2>
+            <div class="page-meta">Monthly income, bin budgets &amp; historical ledger</div>
           </div>
           <div class="header-actions">
-            <button class="btn" onclick="openChaseImportModal()">Import Chase CSV / Paste</button>
+            ${monthSwitcherHtml()}
+            <button class="btn" onclick="openIncomeModal()">Set Income</button>
             <button class="btn" onclick="openEditBinsModal()">Edit Bins</button>
             <button class="btn btn-primary" onclick="openAddPurchaseModal()">+ Log Purchase</button>
           </div>
         </div>
 
         <div class="stats-grid">
+          <div class="stat-box" style="cursor:pointer;" onclick="openIncomeModal()" title="Click to edit expected monthly income">
+            <div class="stat-label">Expected Income (${formatMonthDisplay(selectedMonth)})</div>
+            <div class="stat-value tabular" style="color:var(--accent);">${fmt(expectedIncome)}</div>
+            <div class="stat-sub">Click to edit monthly income</div>
+          </div>
           <div class="stat-box">
-            <div class="stat-label">Total Binned Spent</div>
+            <div class="stat-label">Planned Bills + Bins</div>
+            <div class="stat-value tabular">${fmt(plannedOutflow)}</div>
+            <div class="stat-sub">Bills ${fmt(monthBillsTotal)} + Bins ${fmt(totalBudget)}</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Binned Spent (${formatMonthDisplay(selectedMonth)})</div>
             <div class="stat-value tabular">${fmt(totalSpent)}</div>
-            <div class="stat-sub">of ${fmt(totalBudget)} monthly budget</div>
+            <div class="stat-sub">${fmt(totalBudget - totalSpent)} left in bin budgets</div>
           </div>
           <div class="stat-box">
-            <div class="stat-label">Budget Remaining</div>
-            <div class="stat-value tabular" style="color:${totalBudget - totalSpent < 0 ? 'var(--danger)' : 'var(--accent)'}">
-              ${fmt(totalBudget - totalSpent)}
+            <div class="stat-label">Projected Monthly Margin</div>
+            <div class="stat-value tabular" style="color:${projectedSavings < 0 ? 'var(--danger)' : 'var(--accent)'}">
+              ${fmt(projectedSavings)}
             </div>
-            <div class="stat-sub">${Math.round((totalSpent / (totalBudget || 1)) * 100)}% utilized</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Unbinned Queue</div>
-            <div class="stat-value tabular">${fmt(unbinnedTotal)}</div>
-            <div class="stat-sub">${state.transactions.filter(t => !t.binId).length} items pending</div>
+            <div class="stat-sub">Actual pace: ${fmt(actualLeftFromIncome)}</div>
           </div>
         </div>
 
         <div class="panel">
           <div class="panel-header">
-            <h3 class="panel-title">Bins Breakdown</h3>
+            <h3 class="panel-title">Bins Breakdown — ${formatMonthDisplay(selectedMonth)}</h3>
             <button class="btn btn-sm" onclick="openEditBinsModal()">+ Add / Edit Bins</button>
           </div>
           <div class="bins-grid">
             ${state.bins.map(b => {
-              const spent = getBinSpent(b.id);
+              const spent = getBinSpentForMonth(b.id, selectedMonth);
               const pct = Math.min(100, Math.round((spent / (b.budget || 1)) * 100));
               const fillClass = spent > b.budget ? 'danger' : pct >= 80 ? 'warn' : '';
               return `
@@ -777,7 +1026,7 @@
 
         <div class="panel">
           <div class="panel-header">
-            <h3 class="panel-title">Binned Ledger</h3>
+            <h3 class="panel-title">Binned Ledger — ${formatMonthDisplay(selectedMonth)}</h3>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
               <input type="text" placeholder="Search merchant..." value="${escapeHtml(searchQuery)}" oninput="searchQuery=this.value; renderOverview(document.getElementById('main-content'))" />
               <select onchange="filterBin=this.value; renderOverview(document.getElementById('main-content'))">
@@ -798,7 +1047,7 @@
                 </tr>
               </thead>
               <tbody>
-                ${filtered.length === 0 ? `<tr><td colspan="5" style="text-align:center; color:var(--ink-muted); padding:20px;">No binned transactions match your filter.</td></tr>` :
+                ${filtered.length === 0 ? `<tr><td colspan="5" style="text-align:center; color:var(--ink-muted); padding:20px;">No binned transactions recorded for ${formatMonthDisplay(selectedMonth)}.</td></tr>` :
                   filtered.map(t => {
                     const bin = state.bins.find(b => b.id === t.binId);
                     return `
@@ -822,9 +1071,13 @@
     }
 
     // 3. PLAN & PAYCHECK SPLITS
-    function getBillCoveredTotal(billId) {
+    function getMonthPaychecks(ym) {
+      return state.paychecks.filter(p => (p.month || getCurrentMonthKey()) === ym);
+    }
+
+    function getBillCoveredTotal(billId, ym) {
       let sum = 0;
-      state.paychecks.forEach(p => {
+      getMonthPaychecks(ym).forEach(p => {
         p.allocations.forEach(a => {
           if (a.targetType === 'bill' && a.targetId === billId) sum += Number(a.amount);
         });
@@ -834,15 +1087,23 @@
 
     function renderPlan(main) {
       const sortedBills = [...state.bills].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+      const monthPaychecks = getMonthPaychecks(selectedMonth);
+      const expectedIncome = getExpectedIncomeForMonth(selectedMonth);
+      const loggedPaychecksTotal = monthPaychecks.reduce((s, p) => s + Number(p.amount), 0);
 
       main.innerHTML = `
         <div class="page-header">
           <div>
             <h2 class="page-title">Plan &amp; Paycheck Splits</h2>
-            <div class="page-meta">Allocate paychecks across bills &amp; spending bins</div>
+            <div class="page-meta">
+              Expected Income: <strong>${fmt(expectedIncome)}</strong> &bull; Logged Paychecks: <strong>${fmt(loggedPaychecksTotal)}</strong>
+              (${fmt(expectedIncome - loggedPaychecksTotal)} unlogged)
+            </div>
           </div>
           <div class="header-actions">
-            <button class="btn" onclick="openCoverageModal()">Bill Coverage Overview</button>
+            ${monthSwitcherHtml()}
+            <button class="btn" onclick="openIncomeModal()">Set Income</button>
+            <button class="btn" onclick="openCoverageModal()">Bill Coverage</button>
             <button class="btn" onclick="openAddBillModal()">+ Add Bill</button>
             <button class="btn btn-primary" onclick="openAddPaycheckModal()">+ Add Paycheck</button>
           </div>
@@ -852,12 +1113,12 @@
           <!-- Left: Bills -->
           <div class="panel">
             <div class="panel-header">
-              <h3 class="panel-title">Upcoming Bills</h3>
+              <h3 class="panel-title">Bills &amp; Coverage (${formatMonthDisplay(selectedMonth)})</h3>
               <button class="btn btn-sm" onclick="openCoverageModal()">Coverage</button>
             </div>
             ${sortedBills.length === 0 ? `<div style="color:var(--ink-muted);">No bills added yet.</div>` :
               sortedBills.map(b => {
-                const covered = getBillCoveredTotal(b.id);
+                const covered = getBillCoveredTotal(b.id, selectedMonth);
                 const pct = Math.min(100, Math.round((covered / (b.amount || 1)) * 100));
                 return `
                   <div style="padding:12px 0; border-bottom:1px solid var(--rule);">
@@ -887,14 +1148,14 @@
             }
           </div>
 
-          <!-- Right: Paychecks -->
+          <!-- Right: Paychecks for Selected Month -->
           <div>
-            ${state.paychecks.length === 0 ? `
+            ${monthPaychecks.length === 0 ? `
               <div class="panel">
-                <div style="color:var(--ink-muted); margin-bottom:10px;">No paychecks added yet.</div>
-                <button class="btn btn-primary" onclick="openAddPaycheckModal()">+ Add Paycheck</button>
+                <div style="color:var(--ink-muted); margin-bottom:10px;">No paychecks logged for ${formatMonthDisplay(selectedMonth)} yet.</div>
+                <button class="btn btn-primary" onclick="openAddPaycheckModal()">+ Add Paycheck for ${formatMonthDisplay(selectedMonth)}</button>
               </div>
-            ` : state.paychecks.map(p => {
+            ` : monthPaychecks.map(p => {
               const assigned = p.allocations.reduce((s, a) => s + Number(a.amount), 0);
               const left = Number(p.amount) - assigned;
               return `
@@ -928,7 +1189,7 @@
                           const bill = state.bills.find(b => b.id === a.targetId);
                           if (bill) {
                             label = `Bill: ${bill.name}`;
-                            const totalCov = getBillCoveredTotal(bill.id);
+                            const totalCov = getBillCoveredTotal(bill.id, selectedMonth);
                             const rem = Math.max(0, bill.amount - totalCov);
                             extraInfo = `Covered ${fmt(totalCov)} of ${fmt(bill.amount)}`;
                             if (rem > 0 && left > 0) canCoverRest = true;
@@ -1009,7 +1270,7 @@
 
       const assigned = p.allocations.reduce((s, a) => s + Number(a.amount), 0);
       const paycheckLeft = Math.max(0, Number(p.amount) - assigned);
-      const billRemaining = Math.max(0, Number(bill.amount) - getBillCoveredTotal(bill.id));
+      const billRemaining = Math.max(0, Number(bill.amount) - getBillCoveredTotal(bill.id, selectedMonth));
       const add = Math.min(paycheckLeft, billRemaining);
 
       if (add > 0) {
@@ -1035,7 +1296,7 @@
 
       for (const bill of sortedBills) {
         if (left <= 0) break;
-        const covered = getBillCoveredTotal(bill.id);
+        const covered = getBillCoveredTotal(bill.id, selectedMonth);
         const needed = Number(bill.amount) - covered;
         if (needed > 0) {
           const put = Math.min(left, needed);
@@ -1180,6 +1441,86 @@
       const root = document.getElementById('modal-root');
       root.classList.add('hidden');
       root.innerHTML = '';
+    }
+
+    function openIncomeModal() {
+      const currentMonthVal = getExpectedIncomeForMonth(selectedMonth);
+      const defaultVal = Number(state.defaultMonthlyIncome || 0);
+      openModal(`
+        <h3 style="margin-top:0; font-family:var(--serif);">Expected Monthly Income</h3>
+        <p style="font-size:13px; color:var(--ink-muted);">
+          Set your baseline expected take-home income per month, or override it specifically for <strong>${formatMonthDisplay(selectedMonth)}</strong> (for bonuses, 3-paycheck months, etc.).
+        </p>
+        <div class="form-grid">
+          <div class="field">
+            <label>Income for ${formatMonthDisplay(selectedMonth)} ($)</label>
+            <input id="inc-month" type="number" step="0.01" value="${currentMonthVal}" />
+          </div>
+          <div class="field">
+            <label>Default Monthly Baseline ($)</label>
+            <input id="inc-default" type="number" step="0.01" value="${defaultVal}" />
+          </div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:8px;">
+          <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="submitIncome()">Save Income</button>
+        </div>
+      `);
+    }
+
+    function submitIncome() {
+      const mVal = parseFloat(document.getElementById('inc-month').value);
+      const dVal = parseFloat(document.getElementById('inc-default').value);
+      if (!state.monthlyIncomes) state.monthlyIncomes = {};
+      if (!isNaN(mVal) && mVal >= 0) state.monthlyIncomes[selectedMonth] = mVal;
+      if (!isNaN(dVal) && dVal >= 0) state.defaultMonthlyIncome = dVal;
+      saveState();
+      closeModal();
+      showToast(`Saved expected income for ${formatMonthDisplay(selectedMonth)}.`);
+      render();
+    }
+
+    function openCloudSyncModal() {
+      openModal(`
+        <h3 style="margin-top:0; font-family:var(--serif);">Supabase Cloud Sync</h3>
+        <p style="font-size:13px; color:var(--ink-muted);">
+          Connect your free Supabase project so your phone and computer share the exact same ledger automatically. These keys are saved only in your browser's local storage.
+        </p>
+        <div class="field" style="margin-bottom:10px;">
+          <label>Supabase Project URL</label>
+          <input id="sb-url" type="text" placeholder="https://yourproject.supabase.co" value="${escapeHtml(cloudCfg.url)}" />
+        </div>
+        <div class="field" style="margin-bottom:10px;">
+          <label>Supabase Anon Public Key</label>
+          <input id="sb-key" type="password" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." value="${escapeHtml(cloudCfg.key)}" />
+        </div>
+        <div class="field" style="margin-bottom:14px;">
+          <label>Personal Ledger Passphrase (use the same one on Phone &amp; PC)</label>
+          <input id="sb-ledger" type="text" placeholder="e.g. my-secret-binned-ledger-2026" value="${escapeHtml(cloudCfg.ledgerKey)}" />
+        </div>
+        <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+          <div>
+            ${isCloudConfigured() ? `<button class="btn btn-sm" onclick="pullFromCloud(false)">Pull Latest Now</button>` : ''}
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveAndConnectCloud()">Save &amp; Sync</button>
+          </div>
+        </div>
+      `);
+    }
+
+    async function saveAndConnectCloud() {
+      const url = document.getElementById('sb-url').value.trim();
+      const key = document.getElementById('sb-key').value.trim();
+      const ledgerKey = document.getElementById('sb-ledger').value.trim();
+      saveCloudCfg({ url, key, ledgerKey });
+      closeModal();
+      if (url && key && ledgerKey) {
+        await pullFromCloud(false);
+      } else {
+        showToast('Cloud sync disabled (Local Only mode).');
+      }
     }
 
     function openAddPurchaseModal() {
@@ -1373,9 +1714,9 @@
 
     function openAddPaycheckModal() {
       openModal(`
-        <h3 style="margin-top:0; font-family:var(--serif);">Add Incoming Paycheck</h3>
+        <h3 style="margin-top:0; font-family:var(--serif);">Add Paycheck (${formatMonthDisplay(selectedMonth)})</h3>
         <div class="form-grid">
-          <div class="field"><label>Label / Date</label><input id="p-label" placeholder="e.g. Paycheck Dec 15" /></div>
+          <div class="field"><label>Label / Date</label><input id="p-label" placeholder="e.g. Paycheck #1" /></div>
           <div class="field"><label>Net Amount ($)</label><input id="p-amt" type="number" step="0.01" placeholder="1650.00" /></div>
         </div>
         <div style="display:flex; justify-content:flex-end; gap:8px;">
@@ -1389,7 +1730,7 @@
       const label = document.getElementById('p-label').value.trim();
       const amount = parseFloat(document.getElementById('p-amt').value);
       if (!label || isNaN(amount) || amount <= 0) return;
-      state.paychecks.push({ id: uid('p'), label, amount, allocations: [] });
+      state.paychecks.push({ id: uid('p'), month: selectedMonth, label, amount, allocations: [] });
       saveState();
       closeModal();
       render();
@@ -1436,9 +1777,9 @@
 
     function openCoverageModal() {
       openModal(`
-        <h3 style="margin-top:0; font-family:var(--serif);">All Bills &amp; Paycheck Coverage</h3>
+        <h3 style="margin-top:0; font-family:var(--serif);">All Bills &amp; Coverage (${formatMonthDisplay(selectedMonth)})</h3>
         ${state.bills.map(b => {
-          const covered = getBillCoveredTotal(b.id);
+          const covered = getBillCoveredTotal(b.id, selectedMonth);
           const pct = Math.min(100, Math.round((covered / (b.amount || 1)) * 100));
           return `
             <div style="margin-bottom:14px;">
@@ -1523,7 +1864,11 @@
       return String(str).replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s]));
     }
 
+    // Initial boot: render immediately, then pull from cloud if configured
     render();
+    if (isCloudConfigured()) {
+      pullFromCloud(true);
+    }
   </script>
 </body>
 </html>
