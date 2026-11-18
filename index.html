@@ -891,6 +891,52 @@
       window._toastTimer = setTimeout(() => el.classList.add('hidden'), 3600);
     }
 
+    async function copyFieldText(inputId, label = 'Value') {
+      const inp = document.getElementById(inputId);
+      const val = inp ? inp.value.trim() : '';
+      if (!val) {
+        showToast(`Nothing in ${label} to copy yet.`);
+        return;
+      }
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(val);
+          showToast(`${label} copied to clipboard!`);
+          return;
+        }
+      } catch (e) {}
+
+      // Reliable fallback for password fields / iOS / non-secure contexts
+      const temp = document.createElement('textarea');
+      temp.value = val;
+      temp.setAttribute('readonly', '');
+      temp.style.position = 'fixed';
+      temp.style.opacity = '0';
+      document.body.appendChild(temp);
+      temp.focus();
+      temp.select();
+      temp.setSelectionRange(0, 99999);
+      try {
+        document.execCommand('copy');
+        showToast(`${label} copied to clipboard!`);
+      } catch (err) {
+        showToast(`Could not auto-copy — tap Show and copy manually.`);
+      }
+      document.body.removeChild(temp);
+    }
+
+    function toggleSecretField(inputId, btn) {
+      const inp = document.getElementById(inputId);
+      if (!inp) return;
+      if (inp.type === 'password') {
+        inp.type = 'text';
+        btn.textContent = 'Hide';
+      } else {
+        inp.type = 'password';
+        btn.textContent = 'Show';
+      }
+    }
+
     function updateBadges() {
       const unbinned = state.transactions.filter(t => !t.binId).length;
       const badge = document.getElementById('queue-badge');
@@ -1554,7 +1600,11 @@
 
         <div class="field" style="margin-bottom:10px;">
           <label>SimpleFIN Access URL (Save this if connecting a second device)</label>
-          <input id="sf-access-url" type="password" placeholder="https://user:pass@beta-bridge.simplefin.org/simplefin" value="${escapeHtml(simpleFinCfg.accessUrl)}" />
+          <div style="display:flex; gap:6px;">
+            <input id="sf-access-url" type="password" placeholder="https://user:pass@beta-bridge.simplefin.org/simplefin" value="${escapeHtml(simpleFinCfg.accessUrl)}" style="flex:1;" />
+            <button type="button" class="btn btn-sm" onclick="toggleSecretField('sf-access-url', this)">Show</button>
+            <button type="button" class="btn btn-sm btn-accent" onclick="copyFieldText('sf-access-url', 'SimpleFIN Access URL')">Copy</button>
+          </div>
         </div>
 
         <div class="field" style="margin-bottom:14px;">
@@ -1672,15 +1722,25 @@
         </p>
         <div class="field" style="margin-bottom:10px;">
           <label>Supabase Project URL</label>
-          <input id="sb-url" type="text" placeholder="https://yourproject.supabase.co" value="${escapeHtml(cloudCfg.url)}" />
+          <div style="display:flex; gap:6px;">
+            <input id="sb-url" type="text" placeholder="https://yourproject.supabase.co" value="${escapeHtml(cloudCfg.url)}" style="flex:1;" />
+            <button type="button" class="btn btn-sm" onclick="copyFieldText('sb-url', 'Supabase URL')">Copy</button>
+          </div>
         </div>
         <div class="field" style="margin-bottom:10px;">
           <label>Supabase Publishable / Anon Key</label>
-          <input id="sb-key" type="password" placeholder="sb_publishable_... or eyJ..." value="${escapeHtml(cloudCfg.key)}" />
+          <div style="display:flex; gap:6px;">
+            <input id="sb-key" type="password" placeholder="sb_publishable_... or eyJ..." value="${escapeHtml(cloudCfg.key)}" style="flex:1;" />
+            <button type="button" class="btn btn-sm" onclick="toggleSecretField('sb-key', this)">Show</button>
+            <button type="button" class="btn btn-sm" onclick="copyFieldText('sb-key', 'Supabase Key')">Copy</button>
+          </div>
         </div>
         <div class="field" style="margin-bottom:14px;">
           <label>Personal Ledger Passphrase (use the same one on Phone &amp; PC)</label>
-          <input id="sb-ledger" type="text" placeholder="e.g. my-secret-binned-ledger-2026" value="${escapeHtml(cloudCfg.ledgerKey)}" />
+          <div style="display:flex; gap:6px;">
+            <input id="sb-ledger" type="text" placeholder="e.g. my-secret-binned-ledger-2026" value="${escapeHtml(cloudCfg.ledgerKey)}" style="flex:1;" />
+            <button type="button" class="btn btn-sm" onclick="copyFieldText('sb-ledger', 'Ledger Passphrase')">Copy</button>
+          </div>
         </div>
         <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;">
           <div>
