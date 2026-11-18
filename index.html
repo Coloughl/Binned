@@ -672,9 +672,20 @@
       return { url: '', key: '', ledgerKey: '' };
     }
 
+    function sanitizeUrl(raw) {
+      let s = String(raw || '').trim();
+      const mdMatch = s.match(/\[(https?:\/\/[^\]]+)\]/);
+      if (mdMatch) s = mdMatch[1];
+      return s.replace(/\/$/, '');
+    }
+
     function saveCloudCfg(cfg) {
-      cloudCfg = cfg;
-      localStorage.setItem(CLOUD_CFG_KEY, JSON.stringify(cfg));
+      cloudCfg = {
+        url: sanitizeUrl(cfg.url),
+        key: String(cfg.key || '').trim(),
+        ledgerKey: String(cfg.ledgerKey || '').trim()
+      };
+      localStorage.setItem(CLOUD_CFG_KEY, JSON.stringify(cloudCfg));
       updateSyncUI();
     }
 
@@ -688,6 +699,14 @@
 
     function isCloudConfigured() {
       return Boolean(cloudCfg && cloudCfg.url && cloudCfg.key && cloudCfg.ledgerKey);
+    }
+
+    function getSupabaseHeaders(extra = {}) {
+      const headers = { 'apikey': cloudCfg.key, ...extra };
+      if (cloudCfg.key && cloudCfg.key.startsWith('eyJ')) {
+        headers['Authorization'] = `Bearer ${cloudCfg.key}`;
+      }
+      return headers;
     }
 
     function updateSyncUI(statusOverride) {
@@ -715,22 +734,20 @@
       if (!isCloudConfigured()) return;
       updateSyncUI('syncing');
       try {
-        const cleanUrl = cloudCfg.url.replace(/\/$/, '');
+        const cleanUrl = sanitizeUrl(cloudCfg.url);
         const res = await fetch(`${cleanUrl}/rest/v1/binned_ledgers?on_conflict=ledger_key`, {
           method: 'POST',
-          headers: {
-            'apikey': cloudCfg.key,
-            'Authorization': `Bearer ${cloudCfg.key}`,
+          headers: getSupabaseHeaders({
             'Content-Type': 'application/json',
             'Prefer': 'resolution=merge-duplicates'
-          },
+          }),
           body: JSON.stringify({
             ledger_key: cloudCfg.ledgerKey,
             payload: state,
             updated_at: new Date().toISOString()
           })
         });
-        if (!res.ok) throw new Error('Push failed');
+        if (!res.ok) throw new Error('Push failed: ' + res.status);
         updateSyncUI('online');
       } catch (e) {
         updateSyncUI('error');
@@ -741,17 +758,12 @@
       if (!isCloudConfigured()) return;
       updateSyncUI('syncing');
       try {
-        const cleanUrl = cloudCfg.url.replace(/\/$/, '');
+        const cleanUrl = sanitizeUrl(cloudCfg.url);
         const res = await fetch(
           `${cleanUrl}/rest/v1/binned_ledgers?ledger_key=eq.${encodeURIComponent(cloudCfg.ledgerKey)}&select=payload`,
-          {
-            headers: {
-              'apikey': cloudCfg.key,
-              'Authorization': `Bearer ${cloudCfg.key}`
-            }
-          }
+          { headers: getSupabaseHeaders() }
         );
-        if (!res.ok) throw new Error('Pull failed');
+        if (!res.ok) throw new Error('Pull failed: ' + res.status);
         const rows = await res.json();
         if (rows && rows.length > 0 && rows[0].payload) {
           state = rows[0].payload;
@@ -761,7 +773,6 @@
           render();
           if (!silent) showToast('Synced latest ledger from cloud.');
         } else {
-          // First time connecting this ledger key: push local state up
           await pushToCloud();
           if (!silent) showToast('Initialized new cloud ledger.');
         }
@@ -1484,15 +1495,15 @@
       openModal(`
         <h3 style="margin-top:0; font-family:var(--serif);">Supabase Cloud Sync</h3>
         <p style="font-size:13px; color:var(--ink-muted);">
-          Connect your free Supabase project so your phone and computer share the exact same ledger automatically. These keys are saved only in your browser's local storage.
+          Connect your free Supabase project so your phone and computer share the exact same ledger automatically. Supports both <code>sb_publishable_...</code> and legacy <code>eyJ...</code> anon keys.
         </p>
         <div class="field" style="margin-bottom:10px;">
           <label>Supabase Project URL</label>
           <input id="sb-url" type="text" placeholder="https://yourproject.supabase.co" value="${escapeHtml(cloudCfg.url)}" />
         </div>
         <div class="field" style="margin-bottom:10px;">
-          <label>Supabase Anon Public Key</label>
-          <input id="sb-key" type="password" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." value="${escapeHtml(cloudCfg.key)}" />
+          <label>Supabase Publishable / Anon Key</label>
+          <input id="sb-key" type="password" placeholder="sb_publishable_... or eyJ..." value="${escapeHtml(cloudCfg.key)}" />
         </div>
         <div class="field" style="margin-bottom:14px;">
           <label>Personal Ledger Passphrase (use the same one on Phone &amp; PC)</label>
