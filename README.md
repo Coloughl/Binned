@@ -8,12 +8,15 @@ https://coloughl.github.io/Binned/
 Next, click on the "Settings" tab and find the Supabase Cloud Sync Section. Enter the following information into the provided fields to connect to the Binned Supabase:
 
 Supabase project URL:
+
 https://xkcxikafpnwrtrwwmqbq.supabase.co
 
 Supabase Publishable / Anon Key:
+
 sb_publishable__2wZ2u4EjpJ0R5dtvqvRhA_T6rTDZxy
 
-Personal Ledger Passphrase
+Personal Ledger Passphrase:
+
 For the Personal Ledger Passphrase, come up with a unique (but secret) passphrase. This will become your unique account identifier and how you will be able to sync to your computer and phone.
 
 Click "Save & Sync"
