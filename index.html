@@ -232,6 +232,7 @@
       transition: background 0.12s ease;
     }
     .btn:hover { background: var(--paper-muted); }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
     .btn-primary {
       background: var(--ink);
       color: var(--paper-elevated);
@@ -562,6 +563,7 @@
           <span><span class="sync-dot" id="sync-dot"></span><span id="sync-text">Local Only</span></span>
           <button class="btn btn-sm" style="padding:2px 7px;" onclick="openCloudSyncModal()">Sync</button>
         </div>
+        <button class="btn btn-sm" onclick="openSimpleFinModal()">SimpleFIN Bank Feed</button>
         <button class="btn btn-sm" onclick="exportBackup()">Export JSON Backup</button>
         <button class="btn btn-sm btn-ghost" onclick="triggerRestore()">Restore Backup</button>
         <button class="btn btn-sm btn-danger-outline" onclick="clearSampleData()">Start Fresh (Clear Data)</button>
@@ -581,6 +583,7 @@
   <script>
     const STORAGE_KEY = 'binned_ledger_v2';
     const CLOUD_CFG_KEY = 'binned_supabase_cfg_v1';
+    const SIMPLEFIN_CFG_KEY = 'binned_simplefin_cfg_v1';
 
     function getCurrentMonthKey() {
       const d = new Date();
@@ -645,11 +648,13 @@
 
     let state = loadState();
     let cloudCfg = loadCloudCfg();
+    let simpleFinCfg = loadSimpleFinCfg();
     let currentTab = 'queue';
     let selectedMonth = getCurrentMonthKey();
     let filterBin = 'all';
     let searchQuery = '';
     let extraDebtPayment = 0;
+    let isSyncingBank = false;
 
     function loadState() {
       try {
@@ -670,6 +675,22 @@
         if (raw) return JSON.parse(raw);
       } catch (e) {}
       return { url: '', key: '', ledgerKey: '' };
+    }
+
+    function loadSimpleFinCfg() {
+      try {
+        const raw = localStorage.getItem(SIMPLEFIN_CFG_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch (e) {}
+      return { accessUrl: '', days: 14 };
+    }
+
+    function saveSimpleFinCfg(cfg) {
+      simpleFinCfg = {
+        accessUrl: String(cfg.accessUrl || '').trim(),
+        days: Math.max(1, Math.min(90, Number(cfg.days) || 14))
+      };
+      localStorage.setItem(SIMPLEFIN_CFG_KEY, JSON.stringify(simpleFinCfg));
     }
 
     function sanitizeUrl(raw) {
@@ -699,6 +720,10 @@
 
     function isCloudConfigured() {
       return Boolean(cloudCfg && cloudCfg.url && cloudCfg.key && cloudCfg.ledgerKey);
+    }
+
+    function isSimpleFinConfigured() {
+      return Boolean(isCloudConfigured() && simpleFinCfg && simpleFinCfg.accessUrl);
     }
 
     function getSupabaseHeaders(extra = {}) {
@@ -735,16 +760,12 @@
       updateSyncUI('syncing');
       try {
         const cleanUrl = sanitizeUrl(cloudCfg.url);
-        const res = await fetch(`${cleanUrl}/rest/v1/binned_ledgers?on_conflict=ledger_key`, {
+        const res = await fetch(`${cleanUrl}/rest/v1/rpc/save_ledger`, {
           method: 'POST',
-          headers: getSupabaseHeaders({
-            'Content-Type': 'application/json',
-            'Prefer': 'resolution=merge-duplicates'
-          }),
+          headers: getSupabaseHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
-            ledger_key: cloudCfg.ledgerKey,
-            payload: state,
-            updated_at: new Date().toISOString()
+            p_key: cloudCfg.ledgerKey,
+            p_payload: state
           })
         });
         if (!res.ok) throw new Error('Push failed: ' + res.status);
@@ -759,14 +780,15 @@
       updateSyncUI('syncing');
       try {
         const cleanUrl = sanitizeUrl(cloudCfg.url);
-        const res = await fetch(
-          `${cleanUrl}/rest/v1/binned_ledgers?ledger_key=eq.${encodeURIComponent(cloudCfg.ledgerKey)}&select=payload`,
-          { headers: getSupabaseHeaders() }
-        );
+        const res = await fetch(`${cleanUrl}/rest/v1/rpc/get_ledger`, {
+          method: 'POST',
+          headers: getSupabaseHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ p_key: cloudCfg.ledgerKey })
+        });
         if (!res.ok) throw new Error('Pull failed: ' + res.status);
-        const rows = await res.json();
-        if (rows && rows.length > 0 && rows[0].payload) {
-          state = rows[0].payload;
+        const payload = await res.json();
+        if (payload) {
+          state = payload;
           if (typeof state.defaultMonthlyIncome !== 'number') state.defaultMonthlyIncome = 0;
           if (!state.monthlyIncomes) state.monthlyIncomes = {};
           saveState(true);
@@ -779,7 +801,47 @@
         updateSyncUI('online');
       } catch (e) {
         updateSyncUI('error');
-        if (!silent) showToast('Could not connect to Supabase. Check URL, Key, and SQL table.');
+        if (!silent) showToast('Could not connect to Supabase. Check URL, Key, and SQL setup.');
+      }
+    }
+
+    async function syncSimpleFinNow() {
+      if (!isSimpleFinConfigured()) {
+        openSimpleFinModal();
+        return;
+      }
+      if (isSyncingBank) return;
+      isSyncingBank = true;
+      render();
+      try {
+        // Ensure latest local state is pushed first so we don't overwrite anything
+        await pushToCloud();
+        const cleanUrl = sanitizeUrl(cloudCfg.url);
+        const res = await fetch(`${cleanUrl}/functions/v1/sync-simplefin`, {
+          method: 'POST',
+          headers: getSupabaseHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({
+            action: 'sync',
+            ledger_key: cloudCfg.ledgerKey,
+            access_url: simpleFinCfg.accessUrl,
+            days: simpleFinCfg.days || 14
+          })
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) {
+          throw new Error(data.error || 'SimpleFIN sync failed');
+        }
+        if (data.added > 0) {
+          await pullFromCloud(true);
+          showToast(`Imported ${data.added} new bank purchase${data.added === 1 ? '' : 's'}!`);
+        } else {
+          showToast('Bank feed up to date — no new purchases.');
+        }
+      } catch (e) {
+        showToast('SimpleFIN Error: ' + e.message);
+      } finally {
+        isSyncingBank = false;
+        render();
       }
     }
 
@@ -826,7 +888,7 @@
       el.textContent = msg;
       el.classList.remove('hidden');
       clearTimeout(window._toastTimer);
-      window._toastTimer = setTimeout(() => el.classList.add('hidden'), 3200);
+      window._toastTimer = setTimeout(() => el.classList.add('hidden'), 3600);
     }
 
     function updateBadges() {
@@ -916,7 +978,14 @@
             <div class="page-meta">${queue.length} purchase${queue.length === 1 ? '' : 's'} waiting for a bin (auto-filed by purchase date)</div>
           </div>
           <div class="header-actions">
-            <button class="btn" onclick="openChaseImportModal()">Import Chase CSV / Paste</button>
+            ${isSimpleFinConfigured() ? `
+              <button class="btn btn-accent" onclick="syncSimpleFinNow()" ${isSyncingBank ? 'disabled' : ''}>
+                ${isSyncingBank ? 'Pulling Bank...' : 'Sync Bank Now'}
+              </button>
+            ` : `
+              <button class="btn" onclick="openSimpleFinModal()">Connect SimpleFIN</button>
+            `}
+            <button class="btn" onclick="openChaseImportModal()">Import CSV / Paste</button>
             <button class="btn btn-primary" onclick="openAddPurchaseModal()">+ Log Purchase</button>
           </div>
         </div>
@@ -925,14 +994,20 @@
           <div class="panel" style="text-align:center; padding: 36px 20px;">
             <div style="font-family:var(--serif); font-size:20px; margin-bottom:6px;">All caught up</div>
             <div style="color:var(--ink-muted); margin-bottom:16px;">Every logged purchase has been assigned to a bin.</div>
-            <button class="btn btn-primary" onclick="openAddPurchaseModal()">+ Log a Purchase</button>
+            <div style="display:flex; justify-content:center; gap:8px; flex-wrap:wrap;">
+              ${isSimpleFinConfigured() ? `<button class="btn btn-accent" onclick="syncSimpleFinNow()" ${isSyncingBank ? 'disabled' : ''}>${isSyncingBank ? 'Pulling Bank...' : 'Pull New Bank Purchases'}</button>` : ''}
+              <button class="btn btn-primary" onclick="openAddPurchaseModal()">+ Log a Purchase</button>
+            </div>
           </div>
         ` : queue.map(tx => `
           <div class="queue-item">
             <div class="queue-top">
               <div>
                 <div class="queue-merchant">${escapeHtml(tx.merchant)}</div>
-                <div class="queue-date">${tx.date} &bull; Files into <strong>${formatMonthDisplay((tx.date || selectedMonth).slice(0, 7))}</strong></div>
+                <div class="queue-date">
+                  ${tx.date} &bull; Files into <strong>${formatMonthDisplay((tx.date || selectedMonth).slice(0, 7))}</strong>
+                  ${tx.externalId ? ' &bull; <span class="tag">SimpleFIN</span>' : ''}
+                </div>
               </div>
               <div style="display:flex; align-items:center; gap:10px;">
                 <span class="queue-amount tabular">${fmt(tx.amount)}</span>
@@ -1454,6 +1529,104 @@
       root.innerHTML = '';
     }
 
+    function openSimpleFinModal() {
+      if (!isCloudConfigured()) {
+        alert('Connect Supabase Cloud Sync first (click Sync) so SimpleFIN can save transactions into your cloud ledger.');
+        openCloudSyncModal();
+        return;
+      }
+      openModal(`
+        <h3 style="margin-top:0; font-family:var(--serif);">SimpleFIN Bank Feed</h3>
+        <p style="font-size:13px; color:var(--ink-muted);">
+          Connect your SimpleFIN Bridge account (~$1.50/mo) to pull real Chase purchases directly into your <strong>To Bin Queue</strong> without duplicate entries.
+        </p>
+
+        <div class="panel" style="padding:12px 14px; margin-bottom:14px; background:var(--paper);">
+          <div style="font-size:12px; font-weight:700; margin-bottom:6px;">First-Time Setup: Claim a SimpleFIN Setup Token</div>
+          <div style="display:flex; gap:8px;">
+            <input id="sf-setup-token" type="text" placeholder="Paste one-time Setup Token from SimpleFIN..." style="flex:1;" />
+            <button class="btn btn-accent" id="sf-claim-btn" onclick="claimSimpleFinToken()">Claim Token</button>
+          </div>
+          <div style="font-size:11px; color:var(--ink-muted); margin-top:5px;">
+            Setup tokens work once and automatically convert into your permanent Access URL below.
+          </div>
+        </div>
+
+        <div class="field" style="margin-bottom:10px;">
+          <label>SimpleFIN Access URL (Save this if connecting a second device)</label>
+          <input id="sf-access-url" type="password" placeholder="https://user:pass@beta-bridge.simplefin.org/simplefin" value="${escapeHtml(simpleFinCfg.accessUrl)}" />
+        </div>
+
+        <div class="field" style="margin-bottom:14px;">
+          <label>Lookback Window (Days to scan on sync)</label>
+          <input id="sf-days" type="number" min="1" max="90" value="${simpleFinCfg.days || 14}" style="width:110px;" />
+        </div>
+
+        <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+          <div>
+            ${simpleFinCfg.accessUrl ? `<button class="btn btn-sm btn-danger-outline" onclick="disconnectSimpleFin()">Disconnect</button>` : ''}
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveSimpleFinSettings()">Save &amp; Sync Bank</button>
+          </div>
+        </div>
+      `);
+    }
+
+    async function claimSimpleFinToken() {
+      const tokenInput = document.getElementById('sf-setup-token');
+      const btn = document.getElementById('sf-claim-btn');
+      const setupToken = tokenInput.value.trim();
+      if (!setupToken) return alert('Paste your SimpleFIN Setup Token first.');
+
+      btn.disabled = true;
+      btn.textContent = 'Claiming...';
+      try {
+        const cleanUrl = sanitizeUrl(cloudCfg.url);
+        const res = await fetch(`${cleanUrl}/functions/v1/sync-simplefin`, {
+          method: 'POST',
+          headers: getSupabaseHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ action: 'claim', setup_token: setupToken })
+        });
+        const data = await res.json();
+        if (!res.ok || data.error || !data.access_url) {
+          throw new Error(data.error || 'Could not claim token');
+        }
+        document.getElementById('sf-access-url').value = data.access_url;
+        tokenInput.value = '';
+        saveSimpleFinCfg({
+          accessUrl: data.access_url,
+          days: document.getElementById('sf-days').value
+        });
+        showToast('SimpleFIN token claimed! Copy your Access URL if you also want it on your phone.');
+      } catch (e) {
+        alert('Claim error: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Claim Token';
+      }
+    }
+
+    async function saveSimpleFinSettings() {
+      const accessUrl = document.getElementById('sf-access-url').value.trim();
+      const days = document.getElementById('sf-days').value;
+      saveSimpleFinCfg({ accessUrl, days });
+      closeModal();
+      if (accessUrl) {
+        await syncSimpleFinNow();
+      } else {
+        render();
+      }
+    }
+
+    function disconnectSimpleFin() {
+      saveSimpleFinCfg({ accessUrl: '', days: 14 });
+      closeModal();
+      showToast('Disconnected SimpleFIN bank feed.');
+      render();
+    }
+
     function openIncomeModal() {
       const currentMonthVal = getExpectedIncomeForMonth(selectedMonth);
       const defaultVal = Number(state.defaultMonthlyIncome || 0);
@@ -1495,7 +1668,7 @@
       openModal(`
         <h3 style="margin-top:0; font-family:var(--serif);">Supabase Cloud Sync</h3>
         <p style="font-size:13px; color:var(--ink-muted);">
-          Connect your free Supabase project so your phone and computer share the exact same ledger automatically. Supports both <code>sb_publishable_...</code> and legacy <code>eyJ...</code> anon keys.
+          Connect your Supabase project so your phone and computer share the exact same isolated ledger via your personal passphrase.
         </p>
         <div class="field" style="margin-bottom:10px;">
           <label>Supabase Project URL</label>
