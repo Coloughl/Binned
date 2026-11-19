@@ -705,7 +705,7 @@
             <span>Debts &amp; Loans</span>
           </button>
           <button class="nav-btn" data-tab="buddy">
-            <span>Accounti-bin-ility</span>
+            <span>Accounti-bin-ity</span>
             <span class="badge" id="buddy-badge" style="display:none;">0</span>
           </button>
           <button class="nav-btn" data-tab="settings">
@@ -1041,7 +1041,7 @@
           buddyData.loaded = true;
         }
       } catch (e) {
-        if (!silent) showToast('Could not load Accounti-bin-ility hub. Run the SQL migration in Supabase.');
+        if (!silent) showToast('Could not load Accounti-bin-ity hub. Run the SQL migration in Supabase.');
       } finally {
         buddyData.loading = false;
         updateBadges();
@@ -1885,7 +1885,7 @@
         main.innerHTML = `
           <div class="page-header">
             <div>
-              <h2 class="page-title">Accounti-bin-ility</h2>
+              <h2 class="page-title">Accounti-bin-ity</h2>
               <div class="page-meta">Bin Buddies &amp; Over-Budget Audits</div>
             </div>
           </div>
@@ -1906,7 +1906,7 @@
       main.innerHTML = `
         <div class="page-header">
           <div>
-            <h2 class="page-title">Accounti-bin-ility</h2>
+            <h2 class="page-title">Accounti-bin-ity</h2>
             <div class="page-meta">
               Signed in as <strong>${escapeHtml(cloudCfg.username)}</strong>
               ${cloudCfg.email ? ` &bull; Alerts to <strong>${escapeHtml(cloudCfg.email)}</strong>` : ` &bull; <span style="color:var(--danger); font-weight:800;">No alert email set!</span>`}
@@ -1920,14 +1920,49 @@
           </div>
         </div>
 
-        ${!cloudCfg.email ? `
-          <div class="panel" style="background:var(--gold-soft); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-            <div style="font-size:13px; font-weight:700;">
-              Add your Email in Settings so Binned can notify you when a Bin Buddy sends an Audit!
+        <div class="panel" style="background: linear-gradient(135deg, #dcebe4 0%, #fdf2d0 100%); display:flex; align-items:center; justify-content:space-between; gap:18px; flex-wrap:wrap; border-width:3px;">
+          <div style="display:flex; align-items:center; gap:16px; flex:1; min-width:260px;">
+            <div style="width:76px; height:96px; flex-shrink:0; border:2.5px solid var(--ink); border-radius:8px; background:var(--paper-elevated); box-shadow:var(--shadow-sm); display:flex; flex-direction:column; align-items:center; justify-content:center; padding:4px; text-align:center; position:relative; overflow:hidden;">
+              <img id="ranger-binny-img" src="ranger-binny.jpg" alt="Ranger Binny PSA" style="width:100%; height:100%; object-fit:cover; display:block;" onerror="this.style.display='none'; document.getElementById('ranger-binny-svg').style.display='block';" />
+              <svg id="ranger-binny-svg" style="display:none; width:64px; height:84px;" viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
+                <!-- Smokey Ranger Hat -->
+                <ellipse cx="50" cy="26" rx="34" ry="7" fill="#8b6b43" stroke="#1b1a17" stroke-width="3"/>
+                <path d="M28 25 Q35 8 50 12 Q65 8 72 25 Z" fill="#9c7a4c" stroke="#1b1a17" stroke-width="3"/>
+                <rect x="30" y="21" width="40" height="4" fill="#1d4e3e"/>
+                <!-- Binny Body -->
+                <rect x="27" y="34" width="46" height="54" rx="5" fill="#7d848a" stroke="#1b1a17" stroke-width="3"/>
+                <line x1="38" y1="42" x2="38" y2="80" stroke="#1b1a17" stroke-width="2.5"/>
+                <line x1="50" y1="42" x2="50" y2="80" stroke="#1b1a17" stroke-width="2.5"/>
+                <line x1="62" y1="42" x2="62" y2="80" stroke="#1b1a17" stroke-width="2.5"/>
+                <!-- Eyes & Pointing Finger -->
+                <circle cx="42" cy="52" r="4" fill="#fff" stroke="#1b1a17" stroke-width="2"/>
+                <circle cx="43" cy="52" r="1.8" fill="#1b1a17"/>
+                <circle cx="58" cy="52" r="4" fill="#fff" stroke="#1b1a17" stroke-width="2"/>
+                <circle cx="57" cy="52" r="1.8" fill="#1b1a17"/>
+                <path d="M41 64 Q50 71 59 64" fill="none" stroke="#1b1a17" stroke-width="2.5" stroke-linecap="round"/>
+                <!-- Blue Jeans -->
+                <path d="M32 88 L32 112 L46 112 L50 96 L54 112 L68 112 L68 88 Z" fill="#2c5aa0" stroke="#1b1a17" stroke-width="3"/>
+                <!-- Pointing Arm -->
+                <path d="M73 54 L92 48" stroke="#1b1a17" stroke-width="5" stroke-linecap="round"/>
+                <circle cx="92" cy="48" r="5" fill="#f7f3e8" stroke="#1b1a17" stroke-width="2.5"/>
+              </svg>
             </div>
-            <button class="btn btn-sm btn-primary" onclick="switchTab('settings')">Add Email Now</button>
+            <div>
+              <div style="display:inline-block; background:var(--accent); color:#fff; border:2px solid var(--ink); border-radius:5px; padding:2px 8px; font-size:10.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:5px;">
+                Ranger Binny Says
+              </div>
+              <div style="font-family:var(--comic); font-size:25px; letter-spacing:0.03em; line-height:1.1; text-shadow:1.5px 1.5px 0px var(--gold);">
+                &ldquo;Only You Can Be Accountable!&rdquo;
+              </div>
+              <div style="font-size:12.5px; color:var(--ink-muted); margin-top:4px;">
+                Stay under your monthly bin budgets to keep your ledger private—or face an official Audit from your Bin Buddies.
+              </div>
+            </div>
           </div>
-        ` : ''}
+          ${!cloudCfg.email ? `
+            <button class="btn btn-sm btn-primary" onclick="switchTab('settings')">+ Add Alert Email</button>
+          ` : ''}
+        </div>
 
         <!-- Audits Against You -->
         <div class="panel">
@@ -2364,7 +2399,7 @@
                 </div>
               </div>
               <div class="field" style="margin-bottom:14px;">
-                <label>Notification Email (for Accounti-bin-ility Audits)</label>
+                <label>Notification Email (for Accounti-bin-ity Audits)</label>
                 <input id="set-sb-email" type="email" autocomplete="email" placeholder="you@example.com" value="${escapeHtml(cloudCfg.email || '')}" />
               </div>
               <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;">
