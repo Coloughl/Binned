@@ -828,6 +828,9 @@
           <button class="nav-btn" data-tab="debts">
             <span>Debts &amp; Loans</span>
           </button>
+          <button class="nav-btn" data-tab="retirement">
+            <span>Retirement</span>
+          </button>
           <button class="nav-btn" data-tab="buddy">
             <span>Accounti-bin-ity</span>
             <span class="badge" id="buddy-badge" style="display:none;">0</span>
@@ -1246,6 +1249,28 @@
       }
     }
 
+    async function claimCloudUsername(username, ledgerKey) {
+      const cleanUrl = getSupabaseUrl();
+      const res = await fetch(`${cleanUrl}/rest/v1/rpc/claim_cloud_username`, {
+        method: 'POST',
+        headers: getSupabaseHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          p_username: String(username || '').trim().toLowerCase(),
+          p_ledger_key: ledgerKey
+        })
+      });
+      if (!res.ok) {
+        let detail = '';
+        try { detail = (await res.text()).slice(0, 250); } catch (e) {}
+        throw new Error(`Username registration failed (${res.status}). ${detail}`);
+      }
+      const claimed = await res.json();
+      if (claimed !== true) {
+        throw new Error('That username is already taken. Please choose a different username.');
+      }
+      return true;
+    }
+
     async function pullFromCloud(silent = false) {
       if (!isCloudConfigured()) return;
       updateSyncUI('syncing');
@@ -1304,9 +1329,13 @@
         if (!res.ok || data.error) {
           throw new Error(data.error || 'SimpleFIN sync failed');
         }
+        // Always pull after a successful sync: retirement balances/contributions can
+        // change even when no new spending purchases were imported.
+        await pullFromCloud(true);
         if (data.added > 0) {
-          await pullFromCloud(true);
-          showToast(`Imported ${data.added} new bank purchase${data.added === 1 ? '' : 's'}!`);
+          showToast(`Imported ${data.added} new bank purchase${data.added === 1 ? '' : 's'}${data.retirementUpdated ? ' and updated retirement data' : ''}!`);
+        } else if (data.retirementUpdated) {
+          showToast('Retirement account data updated.');
         } else {
           showToast('Bank feed up to date — no new purchases.');
         }
@@ -1499,6 +1528,7 @@
       else if (currentTab === 'overview') renderOverview(main);
       else if (currentTab === 'plan') renderPlan(main);
       else if (currentTab === 'debts') renderDebts(main);
+      else if (currentTab === 'retirement') renderRetirement(main);
       else if (currentTab === 'buddy') renderBuddyTab(main);
       else if (currentTab === 'settings') renderSettings(main);
     }
@@ -1935,6 +1965,65 @@
       saveState();
       showToast(addedCount > 0 ? `Allocated funds across ${addedCount} uncovered bill(s).` : 'All unpaid bills are already covered!');
       render();
+    }
+
+    // RETIREMENT (ACORNS ROTH IRA)
+    function renderRetirement(main) {
+      const now = new Date();
+      const year = now.getFullYear();
+      const yearStart = `${year}-01-01`;
+      const today = `${year}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const retirement = state.retirement || {};
+      const accounts = Object.values(retirement.accounts || {}).filter(account => {
+        const accountText = `${account.name || ''} ${account.institution || ''}`.toLowerCase();
+        return accountText.includes('acorns') && accountText.includes('roth');
+      });
+      const accountIds = new Set(accounts.map(account => String(account.id)));
+      const contributions = (retirement.contributions || []).filter(contribution => {
+        const date = String(contribution.date || '');
+        return accountIds.has(String(contribution.accountId)) &&
+          date >= yearStart && date <= today && Number(contribution.amount) > 0;
+      });
+      const totalContributions = contributions.reduce((sum, contribution) => sum + Number(contribution.amount || 0), 0);
+      const totalBalance = accounts.reduce((sum, account) => sum + Number(account.balance || 0), 0);
+      const accountNames = accounts.map(account => account.name || 'Acorns Roth IRA').join(', ');
+      const updatedValues = accounts.map(account => account.updatedAt).filter(Boolean).sort();
+      const lastUpdated = updatedValues.length ? new Date(updatedValues[updatedValues.length - 1]).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+      const canSync = isSimpleFinConfigured();
+
+      main.innerHTML = `
+        <div class="page-header">
+          <div>
+            <h2 class="page-title">Retirement</h2>
+            <div class="page-meta">Acorns Roth IRA · ${year} calendar-year contributions</div>
+          </div>
+          <div class="header-actions">
+            ${canSync ? `<button class="btn btn-accent" onclick="syncSimpleFinNow()" ${isSyncingBank ? 'disabled' : ''}>${isSyncingBank ? 'Syncing...' : 'Sync SimpleFIN'}</button>` : `<button class="btn btn-primary" onclick="switchTab('settings')">Connect SimpleFIN</button>`}
+          </div>
+        </div>
+
+        ${accounts.length ? `
+          <div class="two-col">
+            <div class="panel">
+              <div class="panel-header"><h3 class="panel-title">Roth IRA Balance</h3></div>
+              <div style="font-family:var(--display); font-size:clamp(30px, 5vw, 42px); font-weight:800; margin:12px 0 4px;">${fmt(totalBalance)}</div>
+              <div style="font-size:12px; color:var(--ink-muted);">${escapeHtml(accountNames)}</div>
+              ${lastUpdated ? `<div style="font-size:11px; color:var(--ink-muted); margin-top:8px;">Balance last synced ${escapeHtml(lastUpdated)}</div>` : ''}
+            </div>
+            <div class="panel">
+              <div class="panel-header"><h3 class="panel-title">${year} Contributions</h3></div>
+              <div style="font-family:var(--display); font-size:clamp(30px, 5vw, 42px); font-weight:800; margin:12px 0 4px;">${fmt(totalContributions)}</div>
+              <div style="font-size:12px; color:var(--ink-muted);">January 1 – ${now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+            </div>
+          </div>
+        ` : `
+          <div class="panel" style="text-align:center; padding:32px 20px;">
+            <h3 style="font-family:var(--serif); margin-top:0;">No Acorns Roth IRA data yet</h3>
+            <p style="color:var(--ink-muted);">${canSync ? 'Your SimpleFIN connection is active, but no account matching Acorns Roth IRA has been synced yet.' : 'Connect your cloud ledger and SimpleFIN feed in Settings, then sync your accounts here.'}</p>
+            <button class="btn btn-primary" onclick="${canSync ? 'syncSimpleFinNow()' : "switchTab('settings')"}">${canSync ? 'Sync SimpleFIN Now' : 'Open Settings'}</button>
+          </div>
+        `}
+      `;
     }
 
     // 4. DEBTS & LOANS CALCULATOR
@@ -2734,9 +2823,15 @@
         alert('The app does not have its built-in Supabase Project URL and Publishable Key configured yet.');
         return;
       }
-      saveCloudCfg({ username, password, email });
-      await pullFromCloud(false);
-      await syncBuddyProfile(selectedMonth);
+      try {
+        const ledgerKey = await deriveLedgerKey(username, password);
+        await claimCloudUsername(username, ledgerKey);
+        saveCloudCfg({ username, password, email });
+        await pullFromCloud(false);
+        await syncBuddyProfile(selectedMonth);
+      } catch (e) {
+        alert(e.message || 'Could not register this username. Please try again.');
+      }
     }
 
     function signOutCloud() {
