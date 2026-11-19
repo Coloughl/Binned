@@ -809,10 +809,6 @@
             <div class="brand-wordmark">BINNED</div>
             <div class="brand-sub" id="brand-sub-label">Wilderness Ledger</div>
           </div>
-          <div class="theme-pill-bar" title="Switch Visual Theme">
-            <button type="button" class="theme-pill-btn active" id="theme-btn-ranger" onclick="setAppTheme('ranger')">🌲 Park</button>
-            <button type="button" class="theme-pill-btn" id="theme-btn-comic" onclick="setAppTheme('comic')">💥 80s Comic</button>
-          </div>
         </div>
         <nav class="nav-list" id="nav">
           <button class="nav-btn active" data-tab="queue">
@@ -895,10 +891,6 @@
       if (fav) fav.href = t.emblemSrc;
       const subEl = document.getElementById('brand-sub-label');
       if (subEl) subEl.textContent = t.subLabel;
-      const btnR = document.getElementById('theme-btn-ranger');
-      const btnC = document.getElementById('theme-btn-comic');
-      if (btnR) btnR.classList.toggle('active', t.id === 'ranger');
-      if (btnC) btnC.classList.toggle('active', t.id === 'comic');
     }
 
     function setAppTheme(themeId) {
