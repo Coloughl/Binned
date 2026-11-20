@@ -5,24 +5,13 @@ It is in alpha at the moment and will be updated very frequently with new featur
 1.1. To get set up, open the app using the link:
 https://coloughl.github.io/Binned/
 
-1.2. Next, click on the "Settings" tab and find the Supabase Cloud Sync Section. Enter the following information into the provided fields to connect to the Binned Supabase:
+1.2. Go to the Settings tab and find the Cloud Ledger Account Section
 
-1.2.1. Supabase project URL:
+1.3. Come up with a unique username and password for your account, and provide an email address (if you want to join the audit system).
+   - If the password you selected is already in use, an error message will pop up when you go to sync to the cloud.
 
-https://xkcxikafpnwrtrwwmqbq.supabase.co
-
-
-1.2.2. Supabase Publishable / Anon Key:
-
-sb_publishable__2wZ2u4EjpJ0R5dtvqvRhA_T6rTDZxy
-
-
-1.2.3. Personal Ledger Passphrase:
-
-For the Personal Ledger Passphrase, come up with a unique (but secret) passphrase. This will become your unique account identifier and how you will be able to sync to your computer and phone.
-
-
-1.4. Click "Save & Sync"
+1.4. Click "Sign in & Sync"
+   - You now have a Binned account and will just need to remember your username and password to log in using another device or if you ever sign out on your current device.
 
 If you would like to link your bank account to receive a live feed of transaction history and start to *bin*, then follow the following instructions
 
