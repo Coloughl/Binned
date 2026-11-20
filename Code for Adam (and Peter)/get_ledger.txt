@@ -1,0 +1,7 @@
+CREATE OR REPLACE FUNCTION public.get_ledger(p_key text)
+ RETURNS jsonb
+ LANGUAGE sql
+ SECURITY DEFINER
+AS $function$
+  select payload from binned_ledgers where ledger_key = p_key;
+$function$

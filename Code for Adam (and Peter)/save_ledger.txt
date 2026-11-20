@@ -1,0 +1,10 @@
+CREATE OR REPLACE FUNCTION public.save_ledger(p_key text, p_payload jsonb)
+ RETURNS void
+ LANGUAGE sql
+ SECURITY DEFINER
+AS $function$
+  insert into binned_ledgers (ledger_key, payload, updated_at)
+  values (p_key, p_payload, now())
+  on conflict (ledger_key)
+  do update set payload = excluded.payload, updated_at = now();
+$function$
